@@ -727,7 +727,6 @@ MeshPartitioning::distribute_points(
 
   // Get number of processes
   const int mpi_size = MPI::size(mpi_comm);
-  //  const int mpi_rank = MPI::rank(mpi_comm);
 
   // Get geometric dimension
   const int gdim = points.cols();
@@ -739,7 +738,7 @@ MeshPartitioning::distribute_points(
     ranges[i] += ranges[i - 1];
   ranges.insert(ranges.begin(), 0);
 
-  // Create window to point data
+  // Create window to point data to make available for other processes to read
   MPI_Win point_win;
   MPI_Win_create(const_cast<double*>(points.data()),
                  sizeof(double) * points.rows() * points.cols(), sizeof(double),
@@ -759,16 +758,16 @@ MeshPartitioning::distribute_points(
             (required_point - ranges[p]) * gdim, gdim, MPI_DOUBLE, point_win);
   }
 
-  MPI_Win_fence(0, point_win);
-  MPI_Win_free(&point_win);
-
   // Calculate shared points
   const std::size_t mpi_rank = MPI::rank(mpi_comm);
-  std::vector<std::vector<std::size_t>> received_point_indices(mpi_size);
-  MPI::all_to_all(mpi_comm, send_point_indices, received_point_indices);
-  std::map<std::int32_t, std::set<std::uint32_t>> shared_points_local;
-  build_shared_points(mpi_comm, received_point_indices,
-                      {ranges[mpi_rank], ranges[mpi_rank + 1]}, local_indexing);
+  std::map<std::int32_t, std::set<std::uint32_t>> shared_points_local
+      = build_shared_points(mpi_comm, send_point_indices,
+                            {ranges[mpi_rank], ranges[mpi_rank + 1]},
+                            local_indexing);
+
+  // Sync point data
+  MPI_Win_fence(0, point_win);
+  MPI_Win_free(&point_win);
 
   return {std::move(point_coordinates), std::move(shared_points_local)};
 }
@@ -776,7 +775,7 @@ MeshPartitioning::distribute_points(
 std::map<std::int32_t, std::set<std::uint32_t>>
 MeshPartitioning::build_shared_points(
     MPI_Comm mpi_comm,
-    const std::vector<std::vector<std::size_t>>& received_point_indices,
+    const std::vector<std::vector<std::size_t>>& send_point_indices,
     const std::pair<std::size_t, std::size_t> local_point_range,
     const std::vector<std::vector<std::uint32_t>>& local_indexing)
 {
@@ -784,6 +783,8 @@ MeshPartitioning::build_shared_points(
            "Build shared points during distributed mesh construction");
 
   const std::uint32_t mpi_size = MPI::size(mpi_comm);
+  std::vector<std::vector<std::size_t>> received_point_indices(mpi_size);
+  MPI::all_to_all(mpi_comm, send_point_indices, received_point_indices);
 
   // Count number sharing each local point
   std::vector<std::int32_t> n_sharing(
@@ -838,17 +839,14 @@ MeshPartitioning::build_shared_points(
   std::vector<std::vector<std::size_t>> send_sharing(mpi_size);
   for (unsigned int i = 0; i != n_sharing.size(); ++i)
   {
-    if (n_sharing[i] > 0)
+    for (int j = 0; j < n_sharing[i]; ++j)
     {
-      for (int j = 0; j < n_sharing[i]; ++j)
-      {
-        auto& ss = send_sharing[process_list[offset[i] + j * 2]];
-        ss.push_back(n_sharing[i] - 1);
-        ss.push_back(process_list[offset[i] + j * 2 + 1]);
-        for (int k = 0; k < n_sharing[i]; ++k)
-          if (j != k)
-            ss.push_back(process_list[offset[i] + k * 2]);
-      }
+      auto& ss = send_sharing[process_list[offset[i] + j * 2]];
+      ss.push_back(n_sharing[i] - 1);
+      ss.push_back(process_list[offset[i] + j * 2 + 1]);
+      for (int k = 0; k < n_sharing[i]; ++k)
+        if (j != k)
+          ss.push_back(process_list[offset[i] + k * 2]);
     }
   }
 
@@ -873,7 +871,7 @@ MeshPartitioning::build_shared_points(
     }
   }
 
-  return shared_points_local;
+  return std::move(shared_points_local);
 }
 //-----------------------------------------------------------------------------
 std::pair<std::int64_t, std::vector<std::int64_t>>
