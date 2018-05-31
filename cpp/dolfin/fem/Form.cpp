@@ -68,8 +68,9 @@ Form::Form(std::shared_ptr<const ufc_form> ufc_form,
 }
 //-----------------------------------------------------------------------------
 Form::Form(const std::vector<std::shared_ptr<const function::FunctionSpace>>
-               function_spaces)
-    : _coefficients({}), _function_spaces(function_spaces)
+               function_spaces,
+           const std::vector<fem::FiniteElement>& coeff_elements)
+    : _coefficients(coeff_elements), _function_spaces(function_spaces)
 {
   // Set _mesh from function::FunctionSpace and check they are the same
   if (!function_spaces.empty())
@@ -79,6 +80,8 @@ Form::Form(const std::vector<std::shared_ptr<const function::FunctionSpace>>
     if (_mesh != f->mesh())
       throw std::runtime_error("Incompatible mesh");
   }
+
+  init_coeff_scratch_space();
 }
 //-----------------------------------------------------------------------------
 Form::~Form()

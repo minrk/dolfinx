@@ -33,7 +33,7 @@ public:
   FormCoefficients(const ufc_form& ufc_form);
 
   /// Initialise the FormCoefficients with their elements only
-  FormCoefficients(std::vector<fem::FiniteElement>& coefficient_elements);
+  FormCoefficients(const std::vector<fem::FiniteElement>& coefficient_elements);
 
   /// Get number of coefficients
   std::size_t size() const;

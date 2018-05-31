@@ -87,7 +87,8 @@ public:
   /// @param[in] function_spaces (std::vector<_function::FunctionSpace_>)
   ///         Vector of function spaces.
   Form(const std::vector<std::shared_ptr<const function::FunctionSpace>>
-           function_spaces);
+       function_spaces,
+       const std::vector<fem::FiniteElement>& coeff_elements);
 
   /// Destructor
   virtual ~Form();

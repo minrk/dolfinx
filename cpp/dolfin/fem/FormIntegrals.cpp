@@ -156,6 +156,15 @@ void FormIntegrals::set_cell_tabulate_tensor(
   _enabled_coefficients.conservativeResize(i + 1, Eigen::NoChange);
   _enabled_coefficients.row(i) = true;
 }
+///-----------------------------------------------------------------------------
+void FormIntegrals::set_enabled_coefficients(int i,
+                                             const std::vector<bool>& coeffs)
+{
+  int nrows = std::max((int)_enabled_coefficients.rows(), i + 1);
+  int ncols = std::max((int)_enabled_coefficients.cols(), (int)coeffs.size());
+  _enabled_coefficients.conservativeResize(nrows, ncols);
+  std::copy(coeffs.begin(), coeffs.end(), _enabled_coefficients.row(i).data());
+}
 //-----------------------------------------------------------------------------
 int FormIntegrals::count(FormIntegrals::Type t) const
 {

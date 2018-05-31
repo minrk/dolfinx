@@ -64,6 +64,13 @@ public:
   ///    Pointer to list of enabled coefficients for this integral
   const bool* cell_enabled_coefficients(int i) const;
 
+  /// Set the enabled coefficients for cell integral i
+  /// @param i
+  ///    Integral number
+  /// @param coeffs
+  ///    Set of coefficients enabled for this integral
+  void set_enabled_coefficients(int i, const std::vector<bool>& coeffs);
+
   /// Set the function for 'tabulate_tensor' for cell integral i
   void set_cell_tabulate_tensor(int i, void (*fn)(double*, const double* const*,
                                                   const double*, int));

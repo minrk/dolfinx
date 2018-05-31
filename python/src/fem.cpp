@@ -333,8 +333,9 @@ void fem(py::module& m)
       .def(py::init<std::shared_ptr<const ufc_form>,
                     std::vector<std::shared_ptr<
                         const dolfin::function::FunctionSpace>>>())
-      .def(py::init<std::vector<
-               std::shared_ptr<const dolfin::function::FunctionSpace>>>())
+      .def(py::init<
+           std::vector<std::shared_ptr<const dolfin::function::FunctionSpace>>,
+           const std::vector<dolfin::fem::FiniteElement>&>())
       .def("num_coefficients",
            [](const dolfin::fem::Form& self) { return self.coeffs().size(); },
            "Return number of coefficients in form")
@@ -357,6 +358,7 @@ void fem(py::module& m)
              auto tabulate_tensor_ptr = (void (*)(double*, const double* const*,
                                                   const double*, int))addr;
              self.integrals().set_cell_tabulate_tensor(i, tabulate_tensor_ptr);
+             self.integrals().set_enabled_coefficients(i, {true});
            })
       .def("rank", &dolfin::fem::Form::rank)
       .def("mesh", &dolfin::fem::Form::mesh)
