@@ -7,13 +7,15 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import pytest
-from dolfin import *
-from dolfin.cpp.generation import UnitTriangleMesh
-from dolfin.parameter import parameters
+from dolfin import (UnitCubeMesh,
+                    FunctionSpace, VectorFunctionSpace, TensorFunctionSpace,
+                    Constant, MPI, Point, Function,
+                    UserExpression, interpolate, Expression, DOLFIN_EPS, Vertex, lt, cpp)
+from math import sqrt
 import numpy
 import ufl
 
-from dolfin_utils.test import skip_in_parallel, pushpop_parameters, fixture
+from dolfin_utils.test import skip_in_parallel, fixture
 
 
 @fixture
@@ -36,6 +38,11 @@ def W(mesh):
     return VectorFunctionSpace(mesh, 'CG', 1)
 
 
+@fixture
+def Q(mesh):
+    return TensorFunctionSpace(mesh, 'CG', 1)
+
+
 def test_name_argument(W):
     u = Function(W)
     v = Function(W, name="v")
@@ -45,7 +52,7 @@ def test_name_argument(W):
 
 
 def test_compute_point_values(V, W, mesh):
-    from numpy import zeros, all, array
+    from numpy import all
     u = Function(V)
     v = Function(W)
 
@@ -61,6 +68,9 @@ def test_compute_point_values(V, W, mesh):
     u_ones = numpy.ones_like(u_values, dtype=numpy.float64)
     assert all(numpy.isclose(u_values, u_ones))
 
+    v_ones = numpy.ones_like(v_values, dtype=numpy.float64)
+    assert all(numpy.isclose(v_values, v_ones))
+
     u_values2 = u.compute_point_values()
 
     assert all(u_values == u_values2)
@@ -68,7 +78,6 @@ def test_compute_point_values(V, W, mesh):
 
 @pytest.mark.skip
 def test_assign(V, W):
-    from ufl.algorithms import replace
 
     for V0, V1, vector_space in [(V, W, False), (W, V, True)]:
         u = Function(V0)
@@ -82,8 +91,6 @@ def test_assign(V, W):
         u1.vector()[:] = 3.0
         u2.vector()[:] = 4.0
         u3.vector()[:] = 5.0
-
-        scalars = {u: 1.0, u0: 2.0, u1: 3.0, u2: 4.0, u3: 5.0}
 
         uu = Function(V0)
         uu.assign(2 * u)
@@ -142,37 +149,40 @@ def test_assign(V, W):
                 uu.assign(4 * u * u1)
 
 
-@pytest.mark.skip
-def test_call(R, V, W, mesh):
-    from numpy import zeros, all, array
+def test_call(R, V, W, Q, mesh):
+    from numpy import all, allclose
     u0 = Function(R)
     u1 = Function(V)
     u2 = Function(W)
+    u3 = Function(Q)
+
     e0 = Expression("x[0] + x[1] + x[2]", degree=1)
     e1 = Expression(
         ("x[0] + x[1] + x[2]", "x[0] - x[1] - x[2]", "x[0] + x[1] + x[2]"),
+        degree=1)
+    e2 = Expression(
+        (("x[0] + x[1] + x[2]", "x[0] - x[1] - x[2]", "x[0] + x[1] + x[2]"),
+         ("x[0]", "x[1]", "x[2]"),
+         ("-x[0]", "-x[1]", "-x[2]")),
         degree=1)
 
     u0.vector()[:] = 1.0
     u1.interpolate(e0)
     u2.interpolate(e1)
+    u3.interpolate(e2)
 
-    p0 = (Vertex(mesh, 0).point() + Vertex(mesh, 1).point()) / 2.0
-    x0 = (mesh.geometry.x()[0] + mesh.geometry.x()[1]) / 2.0
-    x1 = tuple(x0)
+    p0 = ((Vertex(mesh, 0).point() + Vertex(mesh, 1).point()) / 2.0).array()
+    x0 = (mesh.geometry.x(0) + mesh.geometry.x(1)) / 2.0
 
-    assert round(u0(*x1) - u0(x0), 7) == 0
-    assert round(u0(x1) - u0(p0), 7) == 0
-    assert round(u1(x1) - u1(x0), 7) == 0
-    assert round(u1(*x1) - u1(p0), 7) == 0
-    assert round(u2(x1)[0] - u1(p0), 7) == 0
+    assert round(u0(x0)[0] - u0(x0)[0], 7) == 0
+    assert round(u0(x0)[0] - u0(p0)[0], 7) == 0
+    assert round(u1(x0)[0] - u1(x0)[0], 7) == 0
+    assert round(u1(x0)[0] - u1(p0)[0], 7) == 0
+    assert round(u2(x0)[0][0] - u1(p0)[0], 7) == 0
 
-    assert all(u2(*x1) == u2(x0))
-    assert all(u2(*x1) == u2(p0))
-
-    values = zeros(mesh.geometry.dim, dtype='d')
-    u2(p0, values=values)
-    assert all(values == u2(x0))
+    assert all(u2(x0) == u2(x0))
+    assert all(u2(x0) == u2(p0))
+    assert allclose(u3(x0)[0][:3], u2(x0)[0], rtol=1e-15, atol=1e-15)
 
     with pytest.raises(TypeError):
         u0([0, 0, 0, 0])
