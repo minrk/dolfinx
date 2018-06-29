@@ -37,10 +37,8 @@ Function::Function(std::shared_ptr<const FunctionSpace> V) : _function_space(V)
   // Check that we don't have a subspace
   if (!V->component().empty())
   {
-    log::dolfin_error(
-        "Function.cpp", "create function",
-        "Cannot be created from subspace. Consider collapsing the "
-        "function space");
+    throw std::runtime_error("Cannot create Function from subspace. Consider "
+                             "collapsing the function space");
   }
 
   // Initialize vector
@@ -179,31 +177,6 @@ Function Function::sub(std::size_t i) const
   return Function(sub_space, _vector);
 }
 //-----------------------------------------------------------------------------
-void Function::operator=(const function::FunctionAXPY& axpy)
-{
-  if (axpy.pairs().size() == 0)
-  {
-    log::dolfin_error("Function.cpp", "assign function",
-                      "FunctionAXPY is empty.");
-  }
-
-  // Make an initial assign and scale
-  assert(axpy.pairs()[0].second);
-  *this = *(axpy.pairs()[0].second);
-  if (axpy.pairs()[0].first != 1.0)
-    *_vector *= axpy.pairs()[0].first;
-
-  // Start from item 2 and axpy
-  std::vector<
-      std::pair<double, std::shared_ptr<const Function>>>::const_iterator it;
-  for (it = axpy.pairs().begin() + 1; it != axpy.pairs().end(); it++)
-  {
-    assert(it->second);
-    assert(it->second->vector());
-    _vector->axpy(it->first, *(it->second->vector()));
-  }
-}
-//-----------------------------------------------------------------------------
 std::shared_ptr<la::PETScVector> Function::vector()
 {
   assert(_vector);
@@ -212,8 +185,8 @@ std::shared_ptr<la::PETScVector> Function::vector()
   // Check that this is not a sub function.
   if (_vector->size() != _function_space->dofmap()->global_dimension())
   {
-    log::dolfin_error("Function.cpp", "access vector of degrees of freedom",
-                      "Cannot access a non-const vector from a subfunction");
+    throw std::runtime_error(
+        "Cannot access a non-const vector from a subfunction");
   }
 
   return _vector;
@@ -254,8 +227,8 @@ void Function::eval(Eigen::Ref<EigenRowArrayXXd> values,
         id = close.first;
       else
       {
-        log::dolfin_error("Function.cpp", "evaluate function at point",
-                          "The point is not inside the domain.");
+        throw std::runtime_error("Cannot evaluate function at point. The point "
+                                 "is not inside the domain.");
       }
     }
 
@@ -433,10 +406,10 @@ EigenRowArrayXXd Function::compute_point_values(const mesh::Mesh& mesh) const
   // Check that the mesh matches. Notice that the hash is only
   // compared if the pointers are not matching.
   if (&mesh != _function_space->mesh().get()
-      && mesh.hash() != _function_space->mesh()->hash())
+      and mesh.hash() != _function_space->mesh()->hash())
   {
-    log::dolfin_error("Function.cpp", "interpolate function values at points",
-                      "Non-matching mesh");
+    throw std::runtime_error(
+        "Cannot interpolate function values at points. Non-matching mesh");
   }
 
   // Local data for interpolation on each cell
@@ -495,82 +468,17 @@ void Function::init_vector()
   // Check that function space is not a subspace (view)
   if (dofmap.is_view())
   {
-    log::dolfin_error(
-        "Function.cpp", "initialize vector of degrees of freedom for function",
-        "Cannot be created from subspace. Consider collapsing the "
-        "function space");
+    std::runtime_error("Cannot initialize vector of degrees of freedom for "
+                       "function. Cannot be created from subspace. Consider "
+                       "collapsing the function space");
   }
-
-  // Get index map
-  /*
-  std::shared_ptr<const common::IndexMap> index_map = dofmap.index_map();
-  assert(index_map);
-
-  MPI_Comm comm = _function_space->mesh()->mpi_comm();
-
-  // Create layout for initialising tensor
-  //std::shared_ptr<TensorLayout> tensor_layout;
-  //tensor_layout = factory.create_layout(comm, 1);
-  auto tensor_layout = std::make_shared<TensorLayout>(comm, 0,
-  TensorLayout::Sparsity::DENSE);
-
-  assert(tensor_layout);
-  assert(!tensor_layout->sparsity_pattern());
-  assert(_function_space->mesh());
-  tensor_layout->init({index_map}, TensorLayout::Ghosts::GHOSTED);
-
-  // Create vector of dofs
-  if (!_vector)
-    _vector =
-  std::make_shared<la::la::PETScVector>(_function_space->mesh()->mpi_comm());
-  assert(_vector);
-  if (!_vector->empty())
-  {
-    log::dolfin_error("Function.cpp",
-                 "initialize vector of degrees of freedom for function",
-                 "Cannot re-initialize a non-empty vector. Consider creating a
-  new function");
-
-  }
-  _vector->init(*tensor_layout);
-  _vector->zero();
-  */
 
   // Get index map
   std::shared_ptr<const common::IndexMap> index_map = dofmap.index_map();
   assert(index_map);
 
-  // Get block size
-  std::size_t bs = index_map->block_size();
-
-  // Build local-to-global map (blocks)
-  std::vector<dolfin::la_index_t> local_to_global(
-      index_map->size(common::IndexMap::MapSize::ALL));
-  for (std::size_t i = 0; i < local_to_global.size(); ++i)
-    local_to_global[i] = index_map->local_to_global(i);
-
-  // Build list of ghosts (global block indices)
-  const std::size_t nowned = index_map->size(common::IndexMap::MapSize::OWNED);
-  assert(nowned + index_map->size(common::IndexMap::MapSize::UNOWNED)
-         == local_to_global.size());
-  std::vector<dolfin::la_index_t> ghosts(local_to_global.begin() + nowned,
-                                         local_to_global.end());
-
-  // Create vector of dofs
-  if (!_vector)
-    _vector = std::make_shared<la::PETScVector>(
-        _function_space->mesh()->mpi_comm());
+  _vector = std::make_shared<la::PETScVector>(*index_map);
   assert(_vector);
-
-  if (!_vector->empty())
-  {
-    log::dolfin_error(
-        "Function.cpp", "initialize vector of degrees of freedom for function",
-        "Cannot re-initialize a non-empty vector. Consider creating a "
-        "new function");
-  }
-
-  _vector->init(index_map->local_range(), local_to_global, ghosts, bs);
-  _vector->zero();
+  _vector->set(0.0);
 }
 //-----------------------------------------------------------------------------

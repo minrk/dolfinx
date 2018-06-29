@@ -6,10 +6,9 @@
 
 #pragma once
 
-#include <array>
-#include <boost/multi_array.hpp>
+#include <dolfin/common/types.h>
 #include <memory>
-#include <utility>
+#include <petscvec.h>
 #include <vector>
 
 namespace dolfin
@@ -26,7 +25,8 @@ namespace fem
 class DirichletBC;
 class Form;
 
-/// Assembly of LHS and RHS Forms with DirichletBC boundary conditions applied
+/// Assembly of LHS and RHS Forms with DirichletBC boundary conditions
+/// applied
 class Assembler
 {
 public:
@@ -42,24 +42,28 @@ public:
             std::vector<std::shared_ptr<const Form>> L,
             std::vector<std::shared_ptr<const DirichletBC>> bcs);
 
-  /// Assemble matrix. Dirichlet rows/columns are zeroed, with '1' placed on
-  /// diagonal
+  /// Assemble matrix. Dirichlet rows/columns are zeroed, with '1'
+  /// placed on diagonal
   void assemble(la::PETScMatrix& A, BlockType type = BlockType::nested);
 
-  /// Assemble vector. Boundary conditions have no effect on the assembled vector.
+  /// Assemble vector. Boundary conditions have no effect on the
+  /// assembled vector.
   void assemble(la::PETScVector& b, BlockType type = BlockType::nested);
 
   /// Assemble matrix and vector
   void assemble(la::PETScMatrix& A, la::PETScVector& b);
 
 private:
-  // Assemble matrix. Dirichlet rows/columns are zeroed, with '1' placed on
-  // diagonal
+  // Assemble matrix. Dirichlet rows/columns are zeroed, with '1' placed
+  // on diagonal
   static void assemble(la::PETScMatrix& A, const Form& a,
                        std::vector<std::shared_ptr<const DirichletBC>> bcs);
 
+  // Assemble vector into sequential PETSc Vec
+  static void assemble(Vec b, const Form& L);
+
   // Assemble vector
-  static void assemble(la::PETScVector& b, const Form& L);
+  static void assemble(Eigen::Ref<EigenVectorXd> b, const Form& L);
 
   // Modify RHS vector to account for boundary condition (b <- b - Ax,
   // where x holds prescribed boundary values)

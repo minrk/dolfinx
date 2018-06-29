@@ -49,8 +49,10 @@ void dolfin::MPI::Comm::free()
   {
     int err = MPI_Comm_free(&_comm);
     if (err != MPI_SUCCESS)
+    {
       std::cout << "Error when destroying communicator (MPI_Comm_free)."
                 << std::endl;
+    }
   }
 #endif
 }
@@ -264,8 +266,10 @@ dolfin::Table dolfin::MPI::all_reduce(const MPI_Comm comm,
         y = x;
     };
   else
-    log::dolfin_error("MPI.h", "perform reduction of Table",
-                      "MPI::reduce(comm, table, %d) not implemented", op);
+  {
+    throw std::runtime_error(
+        "Cannot perform reduction of Table. Requested MPI_Op not implemented");
+  }
 
   // Construct dvalues map from obtained data
   std::map<std::array<std::string, 2>, double> dvalues_all;

@@ -15,7 +15,6 @@
 #include <dolfin/function/FunctionSpace.h>
 #include <dolfin/geometry/BoundingBoxTree.h>
 #include <dolfin/la/PETScMatrix.h>
-#include <dolfin/la/PETScVector.h>
 #include <dolfin/log/log.h>
 #include <dolfin/mesh/Cell.h>
 #include <dolfin/mesh/MeshIterator.h>
@@ -531,8 +530,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
     {
       const unsigned int fine_row = i * data_size + k;
       const std::size_t global_fine_dof = global_row_indices[fine_row];
-      int p = finemap->index_map()->global_block_index_owner(global_fine_dof
-                                                             / data_size);
+      int p = finemap->index_map()->owner(global_fine_dof / data_size);
 
       // Loop over the coarse dofs and stuff their contributions
       for (unsigned j = 0; j < eldim; j++)
@@ -545,8 +543,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
         // Set the value
         values[fine_row][j] = temp_values[data_size * j + k];
 
-        int pc = coarsemap->index_map()->global_block_index_owner(coarse_dof
-                                                                  / data_size);
+        int pc = coarsemap->index_map()->owner(coarse_dof / data_size);
         if (p == pc)
           send_dnnz[p].push_back(global_fine_dof);
         else
