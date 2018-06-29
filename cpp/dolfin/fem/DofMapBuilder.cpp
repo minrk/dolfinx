@@ -40,7 +40,7 @@ DofMapBuilder::build(const ufc_dofmap& ufc_map, const mesh::Mesh& mesh)
   const std::size_t D = mesh.topology().dim();
   std::vector<bool> needs_entities(D + 1);
   for (std::size_t d = 0; d <= D; ++d)
-    needs_entities[d] = ufc_map.num_entity_dofs(d) > 0;
+    needs_entities[d] = ufc_map.num_entity_dofs[d] > 0;
 
   // For mesh entities required by UFC dofmap, compute number of
   // entities on this process
@@ -87,7 +87,7 @@ DofMapBuilder::build(const ufc_dofmap& ufc_map, const mesh::Mesh& mesh)
   for (std::size_t d = 0; d < D + 1; ++d)
   {
     const std::int64_t n = mesh.num_entities_global(d);
-    global_dimension += n * ufc_map.num_entity_dofs(d);
+    global_dimension += n * ufc_map.num_entity_dofs[d];
   }
   assert(global_dimension % bs == 0);
 
@@ -152,8 +152,7 @@ DofMapBuilder::build(const ufc_dofmap& ufc_map, const mesh::Mesh& mesh)
   auto index_map = std::make_unique<common::IndexMap>(
       mesh.mpi_comm(), num_owned_nodes, local_to_global_unowned, bs);
   assert(index_map);
-  assert(MPI::sum(mesh.mpi_comm(),
-                  bs * index_map->size(common::IndexMap::MapSize::OWNED))
+  assert(MPI::sum(mesh.mpi_comm(), bs * index_map->size_local())
          == global_dimension);
 
   // Update shared_nodes for node reordering
@@ -210,7 +209,7 @@ DofMapBuilder::build_sub_map_view(
   // Extract needs_entities as vector
   std::vector<bool> needs_entities(D + 1);
   for (std::size_t d = 0; d <= D; ++d)
-    needs_entities[d] = parent_ufc_dofmap.num_entity_dofs(d) > 0;
+    needs_entities[d] = parent_ufc_dofmap.num_entity_dofs[d] > 0;
 
   // Generate and number required mesh entities for local UFC map
   const std::vector<int64_t> num_mesh_entities_local
@@ -240,7 +239,7 @@ DofMapBuilder::build_sub_map_view(
   for (std::size_t d = 0; d < D + 1; ++d)
   {
     const std::int64_t n = mesh.num_entities_global(d);
-    global_dimension += n * ufc_sub_dofmap->num_entity_dofs(d);
+    global_dimension += n * ufc_sub_dofmap->num_entity_dofs[d];
   }
 
   // Store UFC local to re-ordered local if submap has any submaps
@@ -290,7 +289,7 @@ DofMapBuilder::build_local_ufc_dofmap(const ufc_dofmap& ufc_dofmap,
   // Extract needs_entities as vector
   std::vector<bool> needs_entities(D + 1);
   for (std::size_t d = 0; d <= D; ++d)
-    needs_entities[d] = (ufc_dofmap.num_entity_dofs(d) > 0);
+    needs_entities[d] = (ufc_dofmap.num_entity_dofs[d] > 0);
 
   // Generate and number required mesh entities (locally)
   std::vector<int64_t> num_mesh_entities(D + 1, 0);
@@ -556,7 +555,7 @@ DofMapBuilder::extract_global_dofs(
     bool global_dof = true;
     for (std::size_t d = 0; d < num_mesh_entities_local.size(); ++d)
     {
-      if (ufc_map.num_entity_dofs(d) > 0)
+      if (ufc_map.num_entity_dofs[d] > 0)
       {
         global_dof = false;
         break;
@@ -569,7 +568,7 @@ DofMapBuilder::extract_global_dofs(
       std::size_t ndofs = 0;
       for (auto& n : num_mesh_entities_local)
       {
-        ndofs += n * ufc_map.num_entity_dofs(d);
+        ndofs += n * ufc_map.num_entity_dofs[d];
         ++d;
       }
 
@@ -614,7 +613,7 @@ DofMapBuilder::extract_global_dofs(
         unsigned int d = 0;
         for (auto& n : num_mesh_entities_local)
         {
-          offset_local += n * sub_dofmap->num_entity_dofs(d);
+          offset_local += n * sub_dofmap->num_entity_dofs[d];
           ++d;
         }
       }
@@ -663,7 +662,7 @@ DofMapBuilder::extract_ufc_sub_dofmap(
     unsigned int d = 0;
     for (auto& n : num_mesh_entities)
     {
-      offset += n * ufc_tmp_dofmap->num_entity_dofs(d);
+      offset += n * ufc_tmp_dofmap->num_entity_dofs[d];
       ++d;
     }
   }
@@ -691,6 +690,7 @@ DofMapBuilder::extract_ufc_sub_dofmap(
 std::size_t DofMapBuilder::compute_blocksize(const ufc_dofmap& ufc_dofmap,
                                              std::size_t tdim)
 {
+  // return 1;
   bool has_block_structure = false;
   if (ufc_dofmap.num_sub_dofmaps > 1)
   {
@@ -717,8 +717,8 @@ std::size_t DofMapBuilder::compute_blocksize(const ufc_dofmap& ufc_dofmap,
         assert(ufc_sub_dofmap);
         for (std::size_t d = 0; d <= tdim; ++d)
         {
-          if (ufc_sub_dofmap->num_entity_dofs(d)
-              != ufc_sub_dofmap0->num_entity_dofs(d))
+          if (ufc_sub_dofmap->num_entity_dofs[d]
+              != ufc_sub_dofmap0->num_entity_dofs[d])
           {
             has_block_structure = false;
             break;
@@ -749,7 +749,7 @@ DofMapBuilder::build_ufc_node_graph(const ufc_dofmap& ufc_map,
   // Extract needs_entities as vector
   std::vector<bool> needs_entities(D + 1);
   for (std::size_t d = 0; d <= D; ++d)
-    needs_entities[d] = (ufc_map.num_entity_dofs(d) > 0);
+    needs_entities[d] = (ufc_map.num_entity_dofs[d] > 0);
 
   // Generate and number required mesh entities (local & global, and
   // constrained global)
@@ -788,7 +788,7 @@ DofMapBuilder::build_ufc_node_graph(const ufc_dofmap& ufc_map,
   unsigned int d = 0;
   for (auto& n : num_mesh_entities_local)
   {
-    offset_local[block_size] += n * ufc_map.num_entity_dofs(d);
+    offset_local[block_size] += n * ufc_map.num_entity_dofs[d];
     ++d;
   }
 

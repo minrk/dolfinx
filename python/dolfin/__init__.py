@@ -32,7 +32,7 @@ del sys
 from .cpp import __version__
 
 from .cpp.common import (Variable, has_debug, has_hdf5, has_scotch,
-                         has_hdf5_parallel, has_mpi, has_mpi4py, has_petsc,
+                         has_hdf5_parallel, has_mpi, has_mpi4py,
                          has_petsc4py, has_parmetis, has_slepc, has_slepc4py,
                          git_commit_hash, DOLFIN_EPS, DOLFIN_PI, TimingType,
                          timing, timings, list_timings)
@@ -89,13 +89,14 @@ from .mesh import MeshValueCollection
 
 # Import from ufl
 from ufl import (
-    FiniteElement, TensorElement, VectorElement, MixedElement, rhs, lhs,
-    conditional, le, lt, ge, gt, split, cross, inner, dot, grad, curl, dx, div,
-    Measure, det, pi, sin, cos, tan, acos, asin, atan, ln, exp, sqrt, bessel_I,
-    bessel_J, bessel_K, bessel_Y, Dx, ds, dS, dP, dX, dC, interval, triangle,
-    tetrahedron, quadrilateral, hexahedron, avg, jump, sym, tr, Identity,
-    variable, diff, as_vector, as_tensor, as_matrix, system, outer, dev, skew,
-    elem_mult, elem_div, elem_pow, elem_op, erf)
+    FiniteElement, TensorElement, VectorElement, MixedElement,
+    NodalEnrichedElement, rhs, lhs, conditional, le, lt, ge, gt, split, cross,
+    inner, dot, grad, curl, dx, div, Measure, det, pi, sin, cos, tan, acos,
+    asin, atan, ln, exp, sqrt, bessel_I, bessel_J, bessel_K, bessel_Y, Dx, ds,
+    dS, dP, dX, dC, interval, triangle, tetrahedron, quadrilateral, hexahedron,
+    avg, jump, sym, tr, Identity, variable, diff, as_vector, as_tensor,
+    as_matrix, system, outer, dev, skew, elem_mult, elem_div, elem_pow, elem_op,
+    erf)
 from ufl.formoperators import action
 
 # Initialise PETSc

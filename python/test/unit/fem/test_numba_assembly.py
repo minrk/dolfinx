@@ -6,20 +6,21 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import pytest
-import dolfin
-from dolfin import *
+from dolfin import (cpp, UnitSquareMesh, MPI, FunctionSpace, dx, dot, grad,
+                    TestFunction, TrialFunction, list_timings, TimingType)
 from dolfin.la import PETScMatrix, PETScVector
-from dolfin.cpp.fem import SystemAssembler
-from numba import cfunc, types, carray
+from numba import cfunc, types, carray, typeof
 import numpy as np
-import ctypes
 
-from dolfin.jit.jit import dolfin_pc, ffc_jit
+from dolfin.jit.jit import ffc_jit
+
+# Define scalar_type here (change to np.complex128 for complex)
+# e.g. if has_petsc_complex(): scalar_type = np.complex128
+scalar_type = np.float64
 
 
 def tabulate_tensor_A(A_, w_, coords_, cell_orientation):
-    A = carray(A_, (3, 3), dtype=np.float64)
+    A = carray(A_, (3, 3), dtype=scalar_type)
     coordinate_dofs = carray(coords_, (3, 2), dtype=np.float64)
 
     # Ke=∫Ωe BTe Be dΩ
@@ -32,7 +33,7 @@ def tabulate_tensor_A(A_, w_, coords_, cell_orientation):
 
     B = np.array(
         [y1 - y2, y2 - y0, y0 - y1, x2 - x1, x0 - x2, x1 - x0],
-        dtype=np.float64).reshape(2, 3)
+        dtype=scalar_type).reshape(2, 3)
 
     A[:, :] = np.dot(B.T, B) / (2 * Ae)
 
@@ -57,7 +58,7 @@ def tabulate_tensor_A_coeff(A_, w_, coords_, cell_orientation):
 
 
 def tabulate_tensor_b(b_, w_, coords_, cell_orientation):
-    b = carray(b_, (3), dtype=np.float64)
+    b = carray(b_, (3), dtype=scalar_type)
     coordinate_dofs = carray(coords_, (3, 2), dtype=np.float64)
     x0, y0 = coordinate_dofs[0, :]
     x1, y1 = coordinate_dofs[1, :]
@@ -78,8 +79,8 @@ def test_numba_assembly():
     L = dolfin.cpp.fem.Form([Q._cpp_object], [])
 
     sig = types.void(
-        types.CPointer(types.double),
-        types.CPointer(types.CPointer(types.double)),
+        types.CPointer(typeof(scalar_type())),
+        types.CPointer(types.CPointer(typeof(scalar_type()))),
         types.CPointer(types.double), types.intc)
 
     fnA = cfunc(sig, cache=True)(tabulate_tensor_A)
