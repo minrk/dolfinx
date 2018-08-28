@@ -186,6 +186,9 @@ public:
   /// Return pointer to PETSc Vec object
   Vec vec() const;
 
+  /// Reset the underlying Vec
+  void reset(Vec x);
+
 private:
   // PETSc Vec pointer
   Vec _x;

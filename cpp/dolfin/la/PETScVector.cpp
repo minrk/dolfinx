@@ -637,3 +637,18 @@ void PETScVector::set_from_options()
 //-----------------------------------------------------------------------------
 Vec PETScVector::vec() const { return _x; }
 //-----------------------------------------------------------------------------
+void PETScVector::reset(Vec vec)
+{
+//  assert(_x);
+  PetscErrorCode ierr;
+
+  // Decrease reference count to old Vec object
+  ierr = VecDestroy(&_x);
+  CHECK_ERROR("VecDestroy");
+
+  // Store new Vec object and increment reference count
+  _x = vec;
+  ierr = PetscObjectReference((PetscObject)_x);
+  CHECK_ERROR("PetscObjectReference");
+}
+//-----------------------------------------------------------------------------
