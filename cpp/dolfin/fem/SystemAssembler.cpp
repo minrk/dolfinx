@@ -170,9 +170,9 @@ void SystemAssembler::assemble(la::PETScMatrix* A, la::PETScVector* b,
   std::array<UFC*, 2> ufc = {{&A_ufc, &b_ufc}};
 
   // Initialize global tensors
-  if (A && A->empty())
+  if (A)
     init_global_tensor(*A, *_a);
-  if (b && b->empty())
+  if (b)
     init_global_tensor(*b, *_l);
 
   // Gather tensors

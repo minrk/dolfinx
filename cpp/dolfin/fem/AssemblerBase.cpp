@@ -33,14 +33,16 @@ void AssemblerBase::init_global_tensor(la::PETScVector& b, const Form& L)
   if (L.rank() != 1)
     throw std::runtime_error("Form must be rank 1 to initialize vector.");
   assert(L.function_space(0)->dofmap()->index_map());
-  b = la::PETScVector(*L.function_space(0)->dofmap()->index_map());
+  if (b.empty())
+    b = la::PETScVector(*L.function_space(0)->dofmap()->index_map());
   if (!add_values)
     b.set(0.0);
 }
 //-----------------------------------------------------------------------------
 void AssemblerBase::init_global_tensor(la::PETScMatrix& A, const Form& a)
 {
-  A = fem::init_matrix(a);
+  if (A.empty())
+    A = fem::init_matrix(a);
   if (!add_values)
     A.zero();
 }
