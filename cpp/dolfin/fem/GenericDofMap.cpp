@@ -216,3 +216,22 @@ void GenericDofMap::ufc_tabulate_dofs(
   }
 }
 //-----------------------------------------------------------------------------
+void GenericDofMap::permutation(
+    Eigen::Ref<Eigen::Array<int, Eigen::Dynamic, 1>> p,
+    const std::vector<std::vector<Eigen::Array<int, Eigen::Dynamic, 1>>>
+        local_indices,
+    const Eigen::Ref<const Eigen::Array<int64_t, Eigen::Dynamic, 1>>
+        vertex_indices)
+{
+  std::vector<Eigen::Array<int, Eigen::Dynamic, 1>> vertex_local_indices
+      = local_indices[0];
+  int offset = 0;
+  for (auto& e : vertex_local_indices)
+    offset += e.size();
+
+  // Handle edges
+
+
+
+}
+//-----------------------------------------------------------------------------
