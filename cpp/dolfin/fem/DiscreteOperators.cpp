@@ -59,15 +59,15 @@ DiscreteOperators::build_gradient(const function::FunctionSpace& V0,
   }
 
   // Build maps from entities to local dof indices
-  const std::vector<dolfin::la_index_t> edge_to_dof
+  const Eigen::Array<PetscInt, Eigen::Dynamic, 1> edge_to_dof
       = V0.dofmap()->dofs(mesh, 1);
-  const std::vector<dolfin::la_index_t> vertex_to_dof
+  const Eigen::Array<PetscInt, Eigen::Dynamic, 1> vertex_to_dof
       = V1.dofmap()->dofs(mesh, 0);
 
   // Build maps from local dof numbering to global
-  std::vector<std::size_t> local_to_global_map0
+  Eigen::Array<std::size_t, Eigen::Dynamic, 1> local_to_global_map0
       = V0.dofmap()->tabulate_local_to_global_dofs();
-  std::vector<std::size_t> local_to_global_map1
+  Eigen::Array<std::size_t, Eigen::Dynamic, 1> local_to_global_map1
       = V1.dofmap()->tabulate_local_to_global_dofs();
 
   // Initialize edge -> vertex connections
@@ -83,8 +83,8 @@ DiscreteOperators::build_gradient(const function::FunctionSpace& V0,
   la::SparsityPattern pattern(mesh.mpi_comm(), index_maps);
 
   // Build sparsity pattern
-  std::vector<dolfin::la_index_t> rows;
-  std::vector<dolfin::la_index_t> cols;
+  std::vector<PetscInt> rows;
+  std::vector<PetscInt> cols;
   for (auto& edge : mesh::MeshRange<mesh::Edge>(mesh))
   {
     // Row index (global indices)
@@ -103,8 +103,8 @@ DiscreteOperators::build_gradient(const function::FunctionSpace& V0,
     }
   }
 
-  Eigen::Map<const EigenArrayXlaindex> _rows(rows.data(), rows.size());
-  Eigen::Map<const EigenArrayXlaindex> _cols(cols.data(), cols.size());
+  Eigen::Map<const EigenArrayXpetscint> _rows(rows.data(), rows.size());
+  Eigen::Map<const EigenArrayXpetscint> _cols(cols.data(), cols.size());
   pattern.insert_global(_rows, _cols);
   pattern.apply();
 
@@ -114,8 +114,8 @@ DiscreteOperators::build_gradient(const function::FunctionSpace& V0,
   // Build discrete gradient operator/matrix
   for (auto& edge : mesh::MeshRange<mesh::Edge>(mesh))
   {
-    dolfin::la_index_t row;
-    dolfin::la_index_t cols[2];
+    PetscInt row;
+    PetscInt cols[2];
     PetscScalar values[2];
 
     row = local_to_global_map0[edge_to_dof[edge.index()]];

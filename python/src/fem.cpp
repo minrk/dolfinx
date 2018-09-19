@@ -138,39 +138,28 @@ void fem(py::module& m)
       .def("neighbours", &dolfin::fem::GenericDofMap::neighbours)
       .def("shared_nodes", &dolfin::fem::GenericDofMap::shared_nodes)
       .def("cell_dofs", &dolfin::fem::GenericDofMap::cell_dofs)
-      .def("dofs", (std::vector<dolfin::la_index_t>(
+      .def("dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
                        dolfin::fem::GenericDofMap::*)() const)
                        & dolfin::fem::GenericDofMap::dofs)
-      .def("dofs",
-           (std::vector<dolfin::la_index_t>(dolfin::fem::GenericDofMap::*)(
-               const dolfin::mesh::Mesh&, std::size_t) const)
-               & dolfin::fem::GenericDofMap::dofs)
-      .def("entity_dofs",
-           (std::vector<dolfin::la_index_t>(dolfin::fem::GenericDofMap::*)(
-               const dolfin::mesh::Mesh&, std::size_t) const)
-               & dolfin::fem::GenericDofMap::entity_dofs)
-      .def("entity_dofs",
-           (std::vector<dolfin::la_index_t>(dolfin::fem::GenericDofMap::*)(
-               const dolfin::mesh::Mesh&, std::size_t,
-               const std::vector<std::size_t>&) const)
-               & dolfin::fem::GenericDofMap::entity_dofs)
+      .def("dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
+                       dolfin::fem::GenericDofMap::*)(const dolfin::mesh::Mesh&,
+                                                      std::size_t) const)
+                       & dolfin::fem::GenericDofMap::dofs)
+      .def("entity_dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
+                              dolfin::fem::GenericDofMap::*)(
+                              const dolfin::mesh::Mesh&, std::size_t) const)
+                              & dolfin::fem::GenericDofMap::entity_dofs)
+      .def("entity_dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
+                              dolfin::fem::GenericDofMap::*)(
+                              const dolfin::mesh::Mesh&, std::size_t,
+                              const std::vector<std::size_t>&) const)
+                              & dolfin::fem::GenericDofMap::entity_dofs)
       .def("num_entity_dofs", &dolfin::fem::GenericDofMap::num_entity_dofs)
       .def("tabulate_local_to_global_dofs",
            &dolfin::fem::GenericDofMap::tabulate_local_to_global_dofs)
       .def("tabulate_entity_dofs",
-           [](const dolfin::fem::GenericDofMap& instance,
-              std::size_t entity_dim, std::size_t cell_entity_index) {
-             std::vector<int> dofs(instance.num_entity_dofs(entity_dim));
-             instance.tabulate_entity_dofs(dofs, entity_dim, cell_entity_index);
-             return py::array_t<int>(dofs.size(), dofs.data());
-           })
+           &dolfin::fem::GenericDofMap::tabulate_entity_dofs)
       .def("block_size", &dolfin::fem::GenericDofMap::block_size)
-      .def("tabulate_local_to_global_dofs",
-           [](const dolfin::fem::GenericDofMap& instance) {
-             std::vector<std::size_t> dofs
-                 = instance.tabulate_local_to_global_dofs();
-             return py::array_t<std::size_t>(dofs.size(), dofs.data());
-           })
       .def("set", &dolfin::fem::GenericDofMap::set);
 
   // dolfin::fem::DofMap
@@ -269,22 +258,16 @@ void fem(py::module& m)
            std::vector<std::vector<std::shared_ptr<const dolfin::fem::Form>>>,
            std::vector<std::shared_ptr<const dolfin::fem::Form>>,
            std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>>())
-      .def(
-          "assemble",
-          py::overload_cast<dolfin::la::PETScMatrix&, dolfin::la::PETScVector&>(
-              &dolfin::fem::Assembler::assemble))
-      .def("assemble", py::overload_cast<dolfin::la::PETScMatrix&,
-                                         dolfin::fem::Assembler::BlockType>(
+      .def("assemble_matrix", &dolfin::fem::Assembler::assemble_matrix)
+      .def("assemble_vector", &dolfin::fem::Assembler::assemble_vector)
+      .def("assemble", py::overload_cast<dolfin::la::PETScMatrix&>(
                            &dolfin::fem::Assembler::assemble))
-      .def("assemble", py::overload_cast<dolfin::la::PETScVector&,
-                                         dolfin::fem::Assembler::BlockType>(
+      .def("assemble", py::overload_cast<dolfin::la::PETScVector&>(
                            &dolfin::fem::Assembler::assemble));
 
   // dolfin::fem::AssemblerBase
   py::class_<dolfin::fem::AssemblerBase,
              std::shared_ptr<dolfin::fem::AssemblerBase>>(m, "AssemblerBase")
-      //.def("init_global_tensor",
-      //&dolfin::fem::AssemblerBase::init_global_tensor)
       .def_readwrite("add_values", &dolfin::fem::AssemblerBase::add_values)
       .def_readwrite("keep_diagonal",
                      &dolfin::fem::AssemblerBase::keep_diagonal)
