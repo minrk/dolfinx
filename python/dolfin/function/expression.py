@@ -10,13 +10,12 @@
 import types
 import numpy
 import ufl
-from ufl import product
 from ufl.utils.indexflattening import (flatten_multiindex,
                                        shape_to_strides)
-import dolfin.cpp as cpp
-import dolfin.function.jit as jit
 
-__all__ = ["UserExpression"]
+from dolfin import common
+from dolfin import cpp
+from dolfin import function
 
 
 def _select_element(family, cell, degree, value_shape):
@@ -98,9 +97,9 @@ class BaseExpression(ufl.Coefficient):
         if component:
             shape = self.ufl_shape
             assert len(shape) == len(component)
-            value_size = product(shape)
+            value_size = ufl.product(shape)
             index = flatten_multiindex(component, shape_to_strides(shape))
-            if cpp.common.has_petsc_complex():
+            if common.has_petsc_complex:
                 dtype = numpy.complex128
             else:
                 dtype = numpy.float64
@@ -134,11 +133,11 @@ class BaseExpression(ufl.Coefficient):
             return ufl.Coefficient.__call__(self, *args)
 
         # Some help variables
-        value_size = product(self.ufl_element().value_shape())
+        value_size = ufl.product(self.ufl_element().value_shape())
 
         # If values (return argument) is passed, check the type and
         # length
-        if cpp.common.has_petsc_complex():
+        if common.has_petsc_complex:
             dtype = numpy.complex128
         else:
             dtype = numpy.float64
@@ -374,7 +373,7 @@ class Expression(BaseExpression):
                 if not isinstance(k, str):
                     raise KeyError("User parameter key must be a string")
 
-            self._cpp_object = jit.compile_expression(cpp_code, params)
+            self._cpp_object = function.jit.compile_expression(cpp_code, params)
             self._parameters = ExpressionParameters(self._cpp_object, params)
 
         if element and degree:

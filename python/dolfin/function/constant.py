@@ -7,9 +7,11 @@
 
 """Create a constant-valued function with given value."""
 
-import ufl
-import dolfin.cpp as cpp
 import numpy
+import ufl
+
+from dolfin import cpp
+from dolfin import common
 
 
 class Constant(ufl.Coefficient):
@@ -54,7 +56,7 @@ class Constant(ufl.Coefficient):
 
         array = numpy.array(value)
         rank = len(array.shape)
-        if cpp.common.has_petsc_complex():
+        if common.has_petsc_complex:
             value_list = list(map(numpy.complex128, array.flat))
         else:
             value_list = list(map(float, array.flat))
