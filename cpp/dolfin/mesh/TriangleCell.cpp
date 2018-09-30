@@ -175,9 +175,10 @@ double TriangleCell::squared_distance(const Cell& cell,
   // Get the vertices as points
   const MeshGeometry& geometry = cell.mesh().geometry();
   const std::int32_t* vertices = cell.entities(0);
-  const EigenPointVector a = geometry.point(vertices[0]);
-  const EigenPointVector b = geometry.point(vertices[1]);
-  const EigenPointVector c = geometry.point(vertices[2]);
+  EigenPointVector a, b, c;
+  a << geometry.point(vertices[0]);
+  b << geometry.point(vertices[1]);
+  c << geometry.point(vertices[2]);
 
   // Call function to compute squared distance
   return squared_distance(point, a, b, c);

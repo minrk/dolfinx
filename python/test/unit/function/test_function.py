@@ -9,7 +9,7 @@
 import pytest
 from dolfin import (UnitCubeMesh,
                     FunctionSpace, VectorFunctionSpace, TensorFunctionSpace,
-                    Constant, MPI, Point, Function,
+                    Constant, MPI, Function,
                     UserExpression, interpolate, Expression, DOLFIN_EPS, Vertex, lt, cpp)
 from math import sqrt
 import numpy
@@ -250,11 +250,11 @@ def test_near_evaluations(R, mesh):
     a = Vertex(mesh, 0).point().array()
     offset = 0.99 * DOLFIN_EPS
 
-    a_shift_x = Point(a[0] - offset, a[1], a[2]).array()
+    a_shift_x = (a[0] - offset, a[1], a[2])
     assert round(u0(a)[0] - u0(a_shift_x)[0], 7) == 0
 
-    a_shift_xyz = Point(a[0] - offset / sqrt(3), a[1] - offset / sqrt(3),
-                        a[2] - offset / sqrt(3)).array()
+    a_shift_xyz = (a[0] - offset / sqrt(3), a[1] - offset / sqrt(3),
+                   a[2] - offset / sqrt(3))
     assert round(u0(a)[0] - u0(a_shift_xyz)[0], 7) == 0
 
 
