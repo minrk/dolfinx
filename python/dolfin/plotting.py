@@ -7,9 +7,12 @@
 
 import os
 import warnings
-import dolfin
-import dolfin.cpp as cpp
+
 import numpy as np
+
+from dolfin import cpp
+from dolfin import function
+from dolfin import fem
 
 __all__ = ["plot"]
 
@@ -65,11 +68,11 @@ def mplot_mesh(ax, mesh, **kwargs):
 def create_cg1_function_space(mesh, sh):
     r = len(sh)
     if r == 0:
-        V = dolfin.FunctionSpace(mesh, "CG", 1)
+        V = function.FunctionSpace(mesh, "CG", 1)
     elif r == 1:
-        V = dolfin.VectorFunctionSpace(mesh, "CG", 1, dim=sh[0])
+        V = function.VectorFunctionSpace(mesh, "CG", 1, dim=sh[0])
     else:
-        V = dolfin.TensorFunctionSpace(mesh, "CG", 1, shape=sh)
+        V = function.TensorFunctionSpace(mesh, "CG", 1, shape=sh)
     return V
 
 
@@ -78,7 +81,7 @@ def mplot_expression(ax, f, mesh, **kwargs):
     # restructuring mplot_function a bit so it can handle Expression
     # natively
     V = create_cg1_function_space(mesh, f.value_shape)
-    g = dolfin.interpolate(f, V)
+    g = fem.interpolate(f, V)
     return mplot_function(ax, g, **kwargs)
 
 
@@ -97,7 +100,7 @@ def mplot_function(ax, f, **kwargs):
             fspace = fspace.collapse()
         except RuntimeError:
             return
-        fvec = dolfin.interpolate(f, fspace).vector()
+        fvec = fem.interpolate(f, fspace).vector()
 
     if fvec.size() == mesh.num_cells():
         # DG0 cellwise function
@@ -131,7 +134,7 @@ def mplot_function(ax, f, **kwargs):
     elif f.value_rank() == 0:
         # Scalar function, interpolated to vertices
         # TODO: Handle DG1?
-        C = f.compute_vertex_values(mesh)
+        C = f.compute_point_values(mesh)
         if gdim == 2 and tdim == 2:
             mode = kwargs.pop("mode", "contourf")
             if mode == "contourf":
@@ -183,7 +186,7 @@ def mplot_function(ax, f, **kwargs):
 
     elif f.value_rank() == 1:
         # Vector function, interpolated to vertices
-        w0 = f.compute_vertex_values(mesh)
+        w0 = f.compute_point_values(mesh)
         nv = mesh.num_vertices()
         if w0.shape[1] != gdim:
             raise AttributeError(
@@ -217,7 +220,7 @@ def mplot_function(ax, f, **kwargs):
             else:
                 # Return gracefully to make regression test pass without vtk
                 warnings.warn(
-                    'Matplotlib plotting backend does not support displacement for {} in {}}. Continuing without plotting.'.format(tdim, gdim))
+                    'Plotting does not support displacement for {} in {}}. Continuing without plot.'.format(tdim, gdim))
                 return
 
 
@@ -396,7 +399,7 @@ def plot(object, *args, **kwargs):
 
     # Try to project if object is not a standard plottable type
     if not isinstance(object, _all_plottable_types):
-        from dolfin.fem.projection import project
+        from fem.projection import project
         try:
             cpp.log.info("Object cannot be plotted directly, projecting to "
                          "piecewise linears.")

@@ -9,7 +9,6 @@
 #include <dolfin/function/Constant.h>
 #include <dolfin/function/Expression.h>
 #include <dolfin/function/Function.h>
-#include <dolfin/function/FunctionAXPY.h>
 #include <dolfin/function/FunctionSpace.h>
 #include <dolfin/function/SpecialFunctions.h>
 #include <dolfin/geometry/Point.h>
@@ -29,8 +28,8 @@ namespace dolfin_wrappers
 
 void function(py::module& m)
 {
-  // ufc::shape
-  py::class_<ufc::shape>(m, "ufc_shape");
+  // ufc_shape
+  py::class_<ufc_shape>(m, "ufc_shape");
 
   // GenericFunction
   py::class_<dolfin::function::GenericFunction,
@@ -46,22 +45,25 @@ void function(py::module& m)
       // FIXME: Add C++ version that takes a dolfin::mesh::Cell
       .def("eval",
            [](const dolfin::function::GenericFunction& self,
-              Eigen::Ref<dolfin::EigenRowArrayXXd> u,
+              Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                      Eigen::Dynamic, Eigen::RowMajor>>
+                  u,
               Eigen::Ref<const dolfin::EigenRowArrayXXd> x,
               const dolfin::mesh::Cell& cell) { self.eval(u, x, cell); },
            "Evaluate GenericFunction (cell version)")
       .def("eval",
-           (void (dolfin::function::GenericFunction::*)(
-               Eigen::Ref<dolfin::EigenRowArrayXXd>,
-               Eigen::Ref<const dolfin::EigenRowArrayXXd>) const)
-               & dolfin::function::GenericFunction::eval,
+           py::overload_cast<
+               Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                       Eigen::Dynamic, Eigen::RowMajor>>,
+               Eigen::Ref<const dolfin::EigenRowArrayXXd>>(
+               &dolfin::function::GenericFunction::eval, py::const_),
            py::arg("values"), py::arg("x"), "Evaluate GenericFunction")
-      .def("compute_vertex_values",
+      .def("compute_point_values",
            py::overload_cast<const dolfin::mesh::Mesh&>(
-               &dolfin::function::GenericFunction::compute_vertex_values,
+               &dolfin::function::GenericFunction::compute_point_values,
                py::const_),
-           "Compute values at all mesh vertices")
-      .def("compute_vertex_values",
+           "Compute values at all mesh points")
+      .def("compute_point_values",
            [](dolfin::function::GenericFunction& self) {
              auto V = self.function_space();
              if (!V)
@@ -71,9 +73,9 @@ void function(py::module& m)
              if (!mesh)
                throw py::value_error("GenericFunction has no function space "
                                      "mesh. You must supply a mesh.");
-             return self.compute_vertex_values(*mesh);
+             return self.compute_point_values(*mesh);
            },
-           "Compute values at all mesh vertices by using the mesh "
+           "Compute values at all mesh points by using the mesh "
            "function.function_space().mesh()")
       .def("function_space",
            &dolfin::function::GenericFunction::function_space);
@@ -95,13 +97,17 @@ void function(py::module& m)
   {
     using dolfin::function::Expression::Expression;
 
-    void eval(Eigen::Ref<dolfin::EigenRowArrayXXd> values,
+    void eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                      Eigen::Dynamic, Eigen::RowMajor>>
+                  values,
               Eigen::Ref<const dolfin::EigenRowArrayXXd> x) const override
     {
       PYBIND11_OVERLOAD(void, dolfin::function::Expression, eval, values, x);
     }
 
-    void eval(Eigen::Ref<dolfin::EigenRowArrayXXd> values,
+    void eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                      Eigen::Dynamic, Eigen::RowMajor>>
+                  values,
               Eigen::Ref<const dolfin::EigenRowArrayXXd> x,
               const dolfin::mesh::Cell& cell) const override
     {
@@ -114,40 +120,24 @@ void function(py::module& m)
   py::class_<dolfin::function::Expression, PyExpression,
              std::shared_ptr<dolfin::function::Expression>,
              dolfin::function::GenericFunction>(
-      m, "Expression", "An Expression is a function (field) that can appear as "
-                       "a coefficient in a form")
+      m, "Expression",
+      "An Expression is a function (field) that can appear as "
+      "a coefficient in a form")
       .def(py::init<std::vector<std::size_t>>())
       .def("__call__",
            [](const dolfin::function::Expression& self,
               Eigen::Ref<const dolfin::EigenRowArrayXXd> x) {
-             dolfin::EigenRowArrayXXd f(x.rows(), self.value_size());
+             Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic,
+                          Eigen::RowMajor>
+                 f(x.rows(), self.value_size());
              self.eval(f, x);
              return f;
            })
       .def("value_dimension", &dolfin::function::Expression::value_dimension)
       .def("get_property", &dolfin::function::Expression::get_property)
-      .def("set_property",
-           [](dolfin::function::Expression& self, std::string name,
-              py::object value) {
-             if (py::isinstance<dolfin::function::GenericFunction>(value))
-             {
-               auto _v = value.cast<std::shared_ptr<dolfin::function::
-                                                        GenericFunction>>();
-               self.set_generic_function(name, _v);
-             }
-             else if (py::hasattr(value, "_cpp_object"))
-             {
-               auto _v = value.attr("_cpp_object")
-                             .cast<std::shared_ptr<dolfin::function::
-                                                       GenericFunction>>();
-               self.set_generic_function(name, _v);
-             }
-             else
-             {
-               double _v = value.cast<double>();
-               self.set_property(name, _v);
-             }
-           })
+      .def("set_property", &dolfin::function::Expression::set_property)
+      .def("set_generic_function",
+           &dolfin::function::Expression::set_generic_function)
       .def("get_generic_function",
            &dolfin::function::Expression::get_generic_function);
 
@@ -155,13 +145,13 @@ void function(py::module& m)
   py::class_<dolfin::function::Constant,
              std::shared_ptr<dolfin::function::Constant>,
              dolfin::function::Expression>(m, "Constant")
-      .def(py::init<double>())
-      .def(py::init<std::vector<double>>())
-      .def(py::init<std::vector<std::size_t>, std::vector<double>>())
+      .def(py::init<PetscScalar>())
+      .def(py::init<std::vector<PetscScalar>>())
+      .def(py::init<std::vector<std::size_t>, std::vector<PetscScalar>>())
       .def("values",
            [](const dolfin::function::Constant& self) {
              auto v = self.values();
-             return py::array_t<double>(v.size(), v.data());
+             return py::array_t<PetscScalar>(v.size(), v.data());
            })
       /*
       .def("_assign", [](dolfin::function::Constant& self, const
@@ -176,8 +166,8 @@ void function(py::module& m)
       .def("assign",
            [](dolfin::function::Constant& self,
               const dolfin::function::Constant& other) { self = other; })
-      .def("assign",
-           [](dolfin::function::Constant& self, double value) { self = value; })
+      .def("assign", [](dolfin::function::Constant& self,
+                        PetscScalar value) { self = value; })
       /*
       .def("_assign", (const dolfin::function::Constant&
       (dolfin::function::Constant::*)(const
@@ -216,30 +206,18 @@ void function(py::module& m)
       //(dolfin::function::Function::*)(const
       // dolfin::function::Function&))
       //     &dolfin::function::Function::operator=)
-      .def("_assign",
-           (void (dolfin::function::Function::*)(
-               const dolfin::function::FunctionAXPY&))
-               & dolfin::function::Function::operator=)
       .def("__call__",
            [](dolfin::function::Function& self,
               Eigen::Ref<const dolfin::EigenRowArrayXXd> x) {
-             dolfin::EigenRowArrayXXd values(x.rows(), self.value_size());
+             Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic,
+                          Eigen::RowMajor>
+                 values(x.rows(), self.value_size());
              self.eval(values, x);
              return values;
            })
       .def("sub", &dolfin::function::Function::sub,
            "Return sub-function (view into parent Function")
-      .def("interpolate",
-           (void (dolfin::function::Function::*)(
-               const dolfin::function::GenericFunction&))
-               & dolfin::function::Function::interpolate,
-           "Interpolate the function u")
-      .def("interpolate",
-           [](dolfin::function::Function& instance, const py::object v) {
-             auto _v = v.attr("_cpp_object")
-                           .cast<dolfin::function::GenericFunction*>();
-             instance.interpolate(*_v);
-           },
+      .def("interpolate", &dolfin::function::Function::interpolate,
            "Interpolate the function u")
       // FIXME: A lot of error when using non-const version - misused
       // by Python interface?
@@ -253,72 +231,10 @@ void function(py::module& m)
   m.def("interpolate",
         [](const dolfin::function::GenericFunction& f,
            std::shared_ptr<const dolfin::function::FunctionSpace> V) {
-          auto g = std::make_shared<dolfin::function::Function>(V);
+          auto g = std::make_unique<dolfin::function::Function>(V);
           g->interpolate(f);
           return g;
         });
-
-  // dolfin::function::FunctionAXPY
-  py::class_<dolfin::function::FunctionAXPY,
-             std::shared_ptr<dolfin::function::FunctionAXPY>>
-      function_axpy(m, "FunctionAXPY");
-  function_axpy
-      .def(
-          py::init<std::shared_ptr<const dolfin::function::Function>, double>())
-      .def(py::init<std::shared_ptr<const dolfin::function::Function>,
-                    std::shared_ptr<const dolfin::function::Function>,
-                    dolfin::function::FunctionAXPY::Direction>())
-      .def(
-          py::init<std::
-                       vector<std::pair<double,
-                                        std::shared_ptr<const dolfin::function::
-                                                            Function>>>>())
-      .def(py::init([](std::vector<std::pair<double, py::object>> fun) {
-        std::
-            vector<std::pair<double,
-                             std::shared_ptr<const dolfin::function::Function>>>
-                a;
-        for (auto p : fun)
-          a.push_back(
-              {p.first,
-               p.second.attr("_cpp_object")
-                   .cast<std::shared_ptr<const dolfin::function::Function>>()});
-        return dolfin::function::FunctionAXPY(a);
-      }))
-      .def(py::init([](py::object f1, double a) {
-        auto _f1
-            = f1.attr("_cpp_object")
-                  .cast<std::shared_ptr<const dolfin::function::Function>>();
-        return dolfin::function::FunctionAXPY(_f1, a);
-      }))
-      .def(py::self + py::self)
-      .def(py::self + std::shared_ptr<const dolfin::function::Function>())
-      .def("__add__",
-           [](dolfin::function::FunctionAXPY& self, py::object f1) {
-             return (self
-                     + f1.attr("_cpp_object")
-                           .cast<std::shared_ptr<const dolfin::function::
-                                                     Function>>());
-           })
-      .def(py::self - py::self)
-      .def(py::self - std::shared_ptr<const dolfin::function::Function>())
-      .def("__sub__",
-           [](dolfin::function::FunctionAXPY& self, py::object f1) {
-             return (self
-                     - f1.attr("_cpp_object")
-                           .cast<std::shared_ptr<const dolfin::function::
-                                                     Function>>());
-           })
-      .def(py::self * float())
-      .def(py::self / float());
-
-  // dolfin::function::FunctionAXPY enum
-  py::enum_<dolfin::function::FunctionAXPY::Direction>(function_axpy,
-                                                       "Direction")
-      .value("ADD_ADD", dolfin::function::FunctionAXPY::Direction::ADD_ADD)
-      .value("SUB_ADD", dolfin::function::FunctionAXPY::Direction::SUB_ADD)
-      .value("ADD_SUB", dolfin::function::FunctionAXPY::Direction::ADD_SUB)
-      .value("SUB_SUB", dolfin::function::FunctionAXPY::Direction::SUB_SUB);
 
   // dolfin::function::FunctionSpace
   py::class_<dolfin::function::FunctionSpace,
@@ -330,14 +246,7 @@ void function(py::module& m)
       .def(py::init<const dolfin::function::FunctionSpace&>())
       .def("__eq__", &dolfin::function::FunctionSpace::operator==)
       .def("dim", &dolfin::function::FunctionSpace::dim)
-      .def("collapse",
-           [](dolfin::function::FunctionSpace& self) {
-             std::unordered_map<std::size_t, std::size_t> dofs;
-             auto V = self.collapse(dofs);
-             return std::pair<std::shared_ptr<dolfin::function::FunctionSpace>,
-                              std::unordered_map<std::size_t, std::size_t>>(
-                 {V, dofs});
-           })
+      .def("collapse", &dolfin::function::FunctionSpace::collapse)
       .def("component", &dolfin::function::FunctionSpace::component)
       .def("contains", &dolfin::function::FunctionSpace::contains)
       .def("element", &dolfin::function::FunctionSpace::element)

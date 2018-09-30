@@ -20,7 +20,8 @@ using namespace dolfin::fem;
 
 //------------------------------------------------------------------------------
 void LocalAssembler::assemble(
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& A,
+    Eigen::Matrix<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>&
+        A,
     UFC& ufc, const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs,
     const mesh::Cell& cell, const mesh::MeshFunction<std::size_t>* cell_domains,
     const mesh::MeshFunction<std::size_t>* exterior_facet_domains,
@@ -51,11 +52,9 @@ void LocalAssembler::assemble(
       }
       else
       {
-        log::dolfin_error(
-            "LocalAssembler.cpp", "assemble local problem",
-            "Cell <-> facet connectivity not initialized, found "
-            "facet with %d connected cells. Expected 1 or 2 cells",
-            Ncells);
+        throw std::runtime_error(
+            "Cannot assemble local problem. Cell <-> facet "
+            "connectivity not initialized,");
       }
       ++local_facet;
     }
@@ -64,15 +63,14 @@ void LocalAssembler::assemble(
   // Check that there are no vertex integrals
   if (ufc.dolfin_form.integrals().num_vertex_integrals() > 0)
   {
-    log::dolfin_error(
-        "LocalAssembler.cpp", "assemble local problem",
-        "Local problem contains vertex integrals which are not yet "
-        "supported by LocalAssembler");
+    throw std::runtime_error("Local problem contains vertex integrals which "
+                             "are not yet supported by LocalAssembler");
   }
 }
 //------------------------------------------------------------------------------
 void LocalAssembler::assemble_cell(
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& A,
+    Eigen::Matrix<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>&
+        A,
     UFC& ufc, const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs,
     const mesh::Cell& cell, const mesh::MeshFunction<std::size_t>* cell_domains)
 {
@@ -85,7 +83,7 @@ void LocalAssembler::assemble_cell(
   }
 
   // Extract default cell integral
-  const ufc::cell_integral* integral
+  const ufc_cell_integral* integral
       = ufc.dolfin_form.integrals().cell_integral().get();
 
   // Get integral for sub domain (if any)
@@ -106,7 +104,7 @@ void LocalAssembler::assemble_cell(
   }
 
   // Update to current cell
-  ufc.update(cell, coordinate_dofs, integral->enabled_coefficients());
+  ufc.update(cell, coordinate_dofs, integral->enabled_coefficients);
 
   // Tabulate cell tensor directly into A. This overwrites any
   // previous values
@@ -114,7 +112,8 @@ void LocalAssembler::assemble_cell(
 }
 //------------------------------------------------------------------------------
 void LocalAssembler::assemble_exterior_facet(
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& A,
+    Eigen::Matrix<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>&
+        A,
     UFC& ufc, const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs,
     const mesh::Cell& cell, const mesh::Facet& facet,
     const std::size_t local_facet,
@@ -125,7 +124,7 @@ void LocalAssembler::assemble_exterior_facet(
     return;
 
   // Extract default exterior facet integral
-  const ufc::exterior_facet_integral* integral
+  const ufc_exterior_facet_integral* integral
       = ufc.dolfin_form.integrals().exterior_facet_integral().get();
 
   // Get integral for sub domain (if any)
@@ -142,7 +141,7 @@ void LocalAssembler::assemble_exterior_facet(
     return;
 
   // Update to current cell
-  ufc.update(cell, coordinate_dofs, integral->enabled_coefficients());
+  ufc.update(cell, coordinate_dofs, integral->enabled_coefficients);
 
   // Tabulate exterior facet tensor. Here we cannot tabulate directly
   // into A since this will overwrite any previously assembled dx, ds
@@ -159,7 +158,8 @@ void LocalAssembler::assemble_exterior_facet(
 }
 //------------------------------------------------------------------------------
 void LocalAssembler::assemble_interior_facet(
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& A,
+    Eigen::Matrix<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>&
+        A,
     UFC& ufc, const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs,
     const mesh::Cell& cell, const mesh::Facet& facet,
     const std::size_t local_facet,
@@ -171,7 +171,7 @@ void LocalAssembler::assemble_interior_facet(
     return;
 
   // Extract default interior facet integral
-  const ufc::interior_facet_integral* integral
+  const ufc_interior_facet_integral* integral
       = ufc.dolfin_form.integrals().interior_facet_integral().get();
 
   // Get integral for sub domain (if any)
@@ -248,7 +248,7 @@ void LocalAssembler::assemble_interior_facet(
 
   // Update to current pair of cells and facets
   ufc.update(cell0, coordinate_dofs0, cell1, coordinate_dofs1,
-             integral->enabled_coefficients());
+             integral->enabled_coefficients);
 
   // Tabulate interior facet tensor on macro element
   integral->tabulate_tensor(ufc.macro_A.data(), ufc.macro_w(),

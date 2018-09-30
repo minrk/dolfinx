@@ -81,13 +81,36 @@ else()
 endif()
 
 #------------------------------------------------------------------------------
-# Add include directories and libs of required packages
+# Add include directories and libraries of required packages
 
 # UFC
 target_include_directories(dolfin SYSTEM PUBLIC ${UFC_INCLUDE_DIRS})
 
+# DOLFIN uses Eigen data structures for dense linear algebra operations. Eigen
+# performs 'ideal' memory alignment based around the -march flag passed to the
+# compiler.  However, because Python DOLFIN JIT compiles code at runtime, it is
+# possible for the user to build shared objects with incompatible alignment
+# (ABI) if they use a different -march flag than that used to originally build
+# DOLFIN. DOLFIN_EIGEN_MAX_ALIGN_BYTES can be used to force alignment.
+# See: https://eigen.tuxfamily.org/dox/TopicPreprocessorDirectives.html
+# See: https://github.com/FEniCS/dolfinx/pull/143
+
+# Note: The name EIGEN_MAX_ALIGN_BYTES is confusing. In practice, Eigen
+# computes the ideal alignment based around -march.  If the ideal alignment is
+# greater than EIGEN_MAX_ALIGN_BYTES, the ideal alignment is used. If the ideal
+# alignment is less, then EIGEN_MAX_ALIGN_BYTES is used for alignment.
+set(DOLFIN_EIGEN_MAX_ALIGN_BYTES "32" CACHE STRING "\
+Minimum alignment in bytes used for Eigen data structures. Set to 32 for \
+compatibility with AVX user-compiled code and 64 for AVX-512 user-compiled \
+code. Set to 0 for ideal alignment according to -march. Note that if an architecture \
+flag (e.g. \"-march=skylake-avx512\") is set for DOLFIN, Eigen will use the \
+appropriate ideal alignment instead if it is stricter. Otherwise, the value \
+of this variable will be used by Eigen for the alignment of all data structures.\\ 
+")
+
 # Eigen3
 target_include_directories(dolfin SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR})
+target_compile_definitions(dolfin PUBLIC "EIGEN_MAX_ALIGN_BYTES=${DOLFIN_EIGEN_MAX_ALIGN_BYTES}")
 
 # Boost
 target_link_libraries(dolfin PUBLIC Boost::boost)
@@ -97,6 +120,13 @@ endforeach()
 foreach (BOOST_PACKAGE ${DOLFIN_BOOST_COMPONENTS_PRIVATE})
   target_link_libraries(dolfin PRIVATE "Boost::${BOOST_PACKAGE}")
 endforeach()
+
+# MPI
+target_link_libraries(dolfin PUBLIC MPI::MPI_CXX)
+
+# PETSc
+target_link_libraries(dolfin PUBLIC PETSC::petsc)
+target_link_libraries(dolfin PRIVATE PETSC::petsc_static)
 
 #------------------------------------------------------------------------------
 # Optional packages
@@ -117,13 +147,6 @@ if (DOLFIN_ENABLE_PETSC AND DOLFIN_ENABLE_SLEPC AND SLEPC_FOUND)
   target_link_libraries(dolfin PRIVATE SLEPC::slepc_static)
 endif()
 
-# PETSc
-if (DOLFIN_ENABLE_PETSC AND PETSC_FOUND)
-  target_compile_definitions(dolfin PUBLIC HAS_PETSC)
-  target_link_libraries(dolfin PUBLIC PETSC::petsc)
-  target_link_libraries(dolfin PRIVATE PETSC::petsc_static)
-endif()
-
 # SCOTCH
 if (DOLFIN_ENABLE_SCOTCH AND SCOTCH_FOUND)
   target_compile_definitions(dolfin PUBLIC HAS_SCOTCH)
@@ -138,13 +161,6 @@ if (DOLFIN_ENABLE_PARMETIS AND PARMETIS_FOUND)
   target_include_directories(dolfin SYSTEM PRIVATE ${PARMETIS_INCLUDE_DIRS})
 endif()
 
-# MPI
-if (DOLFIN_ENABLE_MPI AND MPI_CXX_FOUND)
-  set(DOLFIN_CXX_FLAGS "${DOLFIN_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
-  target_compile_definitions(dolfin PUBLIC HAS_MPI)
-  target_link_libraries(dolfin PUBLIC ${MPI_CXX_LIBRARIES})
-  target_include_directories(dolfin SYSTEM PUBLIC ${MPI_CXX_INCLUDE_PATH})
-endif()
 
 if (DOLFIN_ENABLE_GEOMETRY_DEBUGGING AND GMP_FOUND AND MPFR_FOUND AND CGAL_FOUND)
   message(STATUS "Appending link flags for geometry debugging")

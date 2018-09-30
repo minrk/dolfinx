@@ -100,7 +100,7 @@ void VTKWriter::write_cell_data(const function::Function& u,
   const std::size_t size = num_cells * data_dim;
 
   // Build lists of dofs and create map
-  std::vector<dolfin::la_index_t> dof_set;
+  std::vector<PetscInt> dof_set;
   std::vector<std::size_t> offset(size + 1);
   std::vector<std::size_t>::iterator cell_offset = offset.begin();
   for (auto& cell : mesh::MeshRange<mesh::Cell>(mesh))
@@ -116,7 +116,7 @@ void VTKWriter::write_cell_data(const function::Function& u,
   }
 
   // Get  values
-  std::vector<double> values(dof_set.size());
+  std::vector<PetscScalar> values(dof_set.size());
   assert(u.vector());
   u.vector()->get_local(values.data(), dof_set.size(), dof_set.data());
 
@@ -128,7 +128,7 @@ void VTKWriter::write_cell_data(const function::Function& u,
 //----------------------------------------------------------------------------
 std::string VTKWriter::ascii_cell_data(const mesh::Mesh& mesh,
                                        const std::vector<std::size_t>& offset,
-                                       const std::vector<double>& values,
+                                       const std::vector<PetscScalar>& values,
                                        std::size_t data_dim, std::size_t rank)
 {
   std::ostringstream ss;

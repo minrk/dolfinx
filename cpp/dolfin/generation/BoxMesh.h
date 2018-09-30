@@ -9,7 +9,6 @@
 #include <array>
 #include <cstddef>
 #include <dolfin/common/MPI.h>
-#include <dolfin/log/log.h>
 #include <dolfin/mesh/CellType.h>
 #include <dolfin/mesh/Mesh.h>
 
@@ -51,29 +50,18 @@ public:
   static mesh::Mesh create(MPI_Comm comm,
                            const std::array<EigenPointVector, 2>& p,
                            std::array<std::size_t, 3> n,
-                           mesh::CellType::Type cell_type)
-  {
-    if (cell_type == mesh::CellType::Type::tetrahedron)
-      return build_tet(comm, p, n);
-    else if (cell_type == mesh::CellType::Type::hexahedron)
-      return build_hex(comm, n);
-    else
-    {
-      log::dolfin_error("BoxMesh.h", "generate box mesh",
-                        "Wrong cell type '%d'", cell_type);
-    }
-
-    // Will never reach this point
-    return build_tet(comm, p, n);
-  }
+                           mesh::CellType::Type cell_type,
+                           const mesh::GhostMode ghost_mode);
 
 private:
   // Build mesh
   static mesh::Mesh build_tet(MPI_Comm comm,
                               const std::array<EigenPointVector, 2>& p,
-                              std::array<std::size_t, 3> n);
+                              std::array<std::size_t, 3> n,
+                              const mesh::GhostMode ghost_mode);
 
-  static mesh::Mesh build_hex(MPI_Comm comm, std::array<std::size_t, 3> n);
+  static mesh::Mesh build_hex(MPI_Comm comm, std::array<std::size_t, 3> n,
+                              const mesh::GhostMode ghost_mode);
 };
 } // namespace generation
 } // namespace dolfin

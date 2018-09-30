@@ -14,12 +14,9 @@ upwards (and not downwards) in order to minimise the potential energy."""
 
 
 from dolfin import *
+from dolfin.io import XDMFFile
 import matplotlib.pyplot as plt
 
-
-if not has_petsc():
-    print("DOLFIN must be compiled at least with PETSc 3.6 to run this demo.")
-    exit(0)
 
 # Read mesh and refine once
 mesh = Mesh("../buckling.xml.gz")
@@ -117,7 +114,7 @@ solver.solve(BucklingProblem(), u.vector(), u_min.vector(), u_max.vector())
 
 # Save solution in XDMF format if available
 out = XDMFFile(mesh.mpi_comm(), "u.xdmf")
-if has_hdf5():
+if has_hdf5:
     out.write(u)
 elif MPI.size(mesh.mpi_comm()) == 1:
     encoding = XDMFFile.Encoding.ASCII

@@ -4,19 +4,15 @@
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-
 """FIXME: Add description"""
 
 import types
-import numpy
-import ufl
-from ufl import product
-from ufl.utils.indexflattening import (flatten_multiindex,
-                                       shape_to_strides)
-import dolfin.cpp as cpp
-import dolfin.function.jit as jit
 
-__all__ = ["UserExpression"]
+import numpy
+
+import ufl
+from dolfin import common, cpp, function
+from ufl.utils.indexflattening import flatten_multiindex, shape_to_strides
 
 
 def _select_element(family, cell, degree, value_shape):
@@ -67,8 +63,7 @@ class _InterfaceExpression(cpp.function.Expression):
 
 
 class BaseExpression(ufl.Coefficient):
-    def __init__(self, cell=None, element=None, domain=None, name=None,
-                 label=None):
+    def __init__(self, cell=None, element=None, domain=None, name=None):
 
         # Some messy cell/domain handling for compatibility, will be
         # straightened out later
@@ -90,8 +85,7 @@ class BaseExpression(ufl.Coefficient):
         ufl.Coefficient.__init__(self, ufl_function_space, count=self.id())
 
         name = name or "f_" + str(ufl.Coefficient.count(self))
-        label = label or "User defined expression"
-        self._cpp_object.rename(name, label)
+        self._cpp_object.rename(name)
 
     def ufl_evaluate(self, x, component, derivatives):
         """Function used by ufl to evaluate the Expression"""
@@ -100,9 +94,13 @@ class BaseExpression(ufl.Coefficient):
         if component:
             shape = self.ufl_shape
             assert len(shape) == len(component)
-            value_size = product(shape)
+            value_size = ufl.product(shape)
             index = flatten_multiindex(component, shape_to_strides(shape))
-            values = numpy.zeros(value_size)
+            if common.has_petsc_complex:
+                dtype = numpy.complex128
+            else:
+                dtype = numpy.float64
+            values = numpy.zeros(value_size, dtype)
             # FIXME: use a function with a return value
             self(*x, values=values)
             return values[index]
@@ -132,21 +130,26 @@ class BaseExpression(ufl.Coefficient):
             return ufl.Coefficient.__call__(self, *args)
 
         # Some help variables
-        value_size = product(self.ufl_element().value_shape())
+        value_size = ufl.product(self.ufl_element().value_shape())
 
         # If values (return argument) is passed, check the type and
         # length
+        if common.has_petsc_complex:
+            dtype = numpy.complex128
+        else:
+            dtype = numpy.float64
         values = kwargs.get("values", None)
         if values is not None:
             if not isinstance(values, numpy.ndarray):
                 raise TypeError("expected a NumPy array for 'values'")
-            if len(values) != value_size or not numpy.issubdtype(values.dtype, 'd'):
-                raise TypeError("expected a double NumPy array of length"
+            if len(values) != value_size or not numpy.issubdtype(
+                    values.dtype, dtype):
+                raise TypeError("expected a NumPy array of length"
                                 " %d for return values." % value_size)
             values_provided = True
         else:
             values_provided = False
-            values = numpy.zeros(value_size, dtype='d')
+            values = numpy.zeros(value_size, dtype=dtype)
 
         # Get dim if element has any domains
         cell = self.ufl_element().cell()
@@ -168,7 +171,7 @@ class BaseExpression(ufl.Coefficient):
 
         # Convert it to an 1D numpy array
         try:
-            x = numpy.fromiter(x, 'd')
+            x = numpy.fromiter(x, dtype)
         except (TypeError, ValueError, AssertionError):
             raise TypeError("expected scalar arguments for the coordinates")
 
@@ -180,7 +183,8 @@ class BaseExpression(ufl.Coefficient):
             # output, and that code that is warned about is still
             # officially supported. See
             # https://bitbucket.org/fenics-project/dolfin/issues/355/
-            # warning("Evaluating an Expression without knowing the right geometric dimension, assuming %d is correct." % len(x))
+            # warning("Evaluating an Expression without knowing the right geometric dimension,
+            #          assuming %d is correct." % len(x))
             pass
         else:
             if len(x) != dim:
@@ -208,17 +212,14 @@ class BaseExpression(ufl.Coefficient):
     def name(self):
         return self._cpp_object.name()
 
-    def label(self):
-        return self._cpp_object.label()
-
     def __str__(self):
         return self._cpp_object.name()
 
     def cpp_object(self):
         return self._cpp_object
 
-    def compute_vertex_values(self, mesh):
-        return self._cpp_object.compute_vertex_values(mesh)
+    def compute_point_values(self, mesh):
+        return self._cpp_object.compute_point_values(mesh)
 
 
 class UserExpression(BaseExpression):
@@ -235,7 +236,6 @@ class UserExpression(BaseExpression):
         cell = kwargs.pop("cell", None)
         domain = kwargs.pop("domain", None)
         name = kwargs.pop("name", None)
-        label = kwargs.pop("label", None)
         # mpi_comm = kwargs.pop("mpi_comm", None)
         if (len(kwargs) > 0):
             raise RuntimeError("Invalid keyword argument")
@@ -245,32 +245,36 @@ class UserExpression(BaseExpression):
             if hasattr(self, "value_shape"):
                 value_shape = self.value_shape()
             else:
-                print("WARNING: user expression has not supplied value_shape method or an element. Assuming scalar element.")
+                print(
+                    "User expression has not supplied value_shape method or an element. Assuming scalar element."
+                )
                 value_shape = ()
 
-            element = _select_element(family=None, cell=cell, degree=degree,
-                                      value_shape=value_shape)
+            element = _select_element(
+                family=None, cell=cell, degree=degree, value_shape=value_shape)
         else:
             value_shape = element.value_shape()
 
         self._cpp_object = _InterfaceExpression(self, value_shape)
-        BaseExpression.__init__(self, cell=cell, element=element, domain=domain,
-                                name=name, label=label)
+        BaseExpression.__init__(
+            self, cell=cell, element=element, domain=domain, name=name)
 
 
 class ExpressionParameters(object):
     """Storage and setting/getting of User Parameters attached to Expression"""
+
     def __init__(self, cpp_object, params):
         self._params = params
         self._cpp_object = cpp_object
         if "user_parameters" in self._params:
-            raise RuntimeError("'user_parameters' is reserved. Do not use in Expression")
+            raise RuntimeError(
+                "'user_parameters' is reserved. Do not use in Expression")
         for k, v in self._params.items():
             self[k] = v
 
     def __getitem__(self, key):
         if key in self._params.keys():
-            if isinstance(self._params[key], (float, int)):
+            if isinstance(self._params[key], (float, complex, int)):
                 return self._cpp_object.get_property(key)
             else:
                 return self._cpp_object.get_generic_function(key)
@@ -302,11 +306,12 @@ class CompiledExpression(BaseExpression):
         cell = kwargs.pop("cell", None)
         domain = kwargs.pop("domain", None)
         name = kwargs.pop("name", None)
-        label = kwargs.pop("label", None)
         # mpi_comm = kwargs.pop("mpi_comm", None)
 
         if not isinstance(cpp_module, cpp.function.Expression):
-            raise RuntimeError("Must supply compiled C++ Expression module to CompiledExpression")
+            raise RuntimeError(
+                "Must supply compiled C++ Expression module to CompiledExpression"
+            )
         else:
             self._cpp_object = cpp_module
 
@@ -315,25 +320,27 @@ class CompiledExpression(BaseExpression):
                 if not isinstance(k, str):
                     raise KeyError("User Parameter key must be a string")
                 if not hasattr(self._cpp_object, k):
-                    raise AttributeError("Compiled module does not have attribute %s", k)
+                    raise AttributeError(
+                        "Compiled module does not have attribute %s", k)
                 setattr(self._cpp_object, k, val)
 
         if element and degree:
-            raise RuntimeError("Cannot specify an element and a degree for Expressions.")
+            raise RuntimeError(
+                "Cannot specify an element and a degree for Expressions.")
 
         # Deduce element type if not provided
         if element is None:
             if degree is None:
                 raise KeyError("Must supply element or degree")
-            value_shape = tuple(self.value_dimension(i)
-                                for i in range(self.value_rank()))
+            value_shape = tuple(
+                self.value_dimension(i) for i in range(self.value_rank()))
             if domain is not None and cell is None:
                 cell = domain.ufl_cell()
-            element = _select_element(family=None, cell=cell, degree=degree,
-                                      value_shape=value_shape)
+            element = _select_element(
+                family=None, cell=cell, degree=degree, value_shape=value_shape)
 
-        BaseExpression.__init__(self, cell=cell, element=element, domain=domain,
-                                name=name, label=label)
+        BaseExpression.__init__(
+            self, cell=cell, element=element, domain=domain, name=name)
 
     def __getattr__(self, name):
         if hasattr(self._cpp_object, name):
@@ -361,34 +368,37 @@ class Expression(BaseExpression):
         cell = kwargs.pop("cell", None)
         domain = kwargs.pop("domain", None)
         name = kwargs.pop("name", None)
-        label = kwargs.pop("label", None)
         # FIXME: feed mpi_comm through to JIT
         # mpi_comm = kwargs.pop("mpi_comm", None)
 
         if not isinstance(cpp_code, (str, tuple, list)):
-            raise RuntimeError("Must supply C++ code to Expression. You may want to use UserExpression")
+            raise RuntimeError(
+                "Must supply C++ code to Expression. You may want to use UserExpression"
+            )
         else:
             params = kwargs
             for k in params:
                 if not isinstance(k, str):
                     raise KeyError("User parameter key must be a string")
 
-            self._cpp_object = jit.compile_expression(cpp_code, params)
+            self._cpp_object = function.jit.compile_expression(
+                cpp_code, params)
             self._parameters = ExpressionParameters(self._cpp_object, params)
 
         if element and degree:
-            raise RuntimeError("Cannot specify an element and a degree for Expressions.")
+            raise RuntimeError(
+                "Cannot specify an element and a degree for Expressions.")
 
         # Deduce element type if not provided
         if element is None:
             if degree is None:
                 raise KeyError("Must supply element or degree")
-            value_shape = tuple(self.value_dimension(i)
-                                for i in range(self.value_rank()))
+            value_shape = tuple(
+                self.value_dimension(i) for i in range(self.value_rank()))
             if domain is not None and cell is None:
                 cell = domain.ufl_cell()
-            element = _select_element(family=None, cell=cell, degree=degree,
-                                      value_shape=value_shape)
+            element = _select_element(
+                family=None, cell=cell, degree=degree, value_shape=value_shape)
 
         # FIXME: The below is invasive and fragile. Fix multistage so
         #        this is not required.
@@ -397,8 +407,8 @@ class Expression(BaseExpression):
         self._user_parameters = kwargs
         self._cppcode = cpp_code
 
-        BaseExpression.__init__(self, cell=cell, element=element, domain=domain,
-                                name=name, label=label)
+        BaseExpression.__init__(
+            self, cell=cell, element=element, domain=domain, name=name)
 
     def __getattr__(self, name):
         "Pass attributes through to (JIT compiled) Expression object"

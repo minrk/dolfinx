@@ -6,32 +6,35 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
+import pytest
+from dolfin import (RectangleMesh, MPI, Point, CellType, FunctionSpace, Constant,
+                    TestFunction, TrialFunction, inner, grad, dx, system, lhs, rhs)
 
-from dolfin import *
 
+@pytest.mark.skip
 def test_lhs_rhs_simple():
     """Test taking lhs/rhs of DOLFIN specific forms (constants
     without cell). """
 
-    mesh = RectangleMesh(Point(0, 0), Point(2, 1), 3, 5)
+    mesh = RectangleMesh.create(MPI.comm_world, [Point(0, 0), Point(2, 1)], [3, 5], CellType.Type.triangle)
     V = FunctionSpace(mesh, "CG", 1)
     f = Constant(2.0)
     g = Constant(3.0)
     v = TestFunction(V)
     u = TrialFunction(V)
 
-    F = inner(g*grad(f*v), grad(u))*dx + f*v*dx
+    F = inner(g * grad(f * v), grad(u)) * dx + f * v * dx
     a, L = system(F)
 
     Fl = lhs(F)
     Fr = rhs(F)
+    assert(Fr)
 
-    a0 = inner(grad(v), grad(u))*dx
+    a0 = inner(grad(v), grad(u)) * dx
 
-    n = assemble(a).norm("frobenius")
-    nl = assemble(Fl).norm("frobenius")
-    n0 = 6.0*assemble(a0).norm("frobenius")
+    n = assemble(a).norm("frobenius")  # noqa
+    nl = assemble(Fl).norm("frobenius")  # noqa
+    n0 = 6.0 * assemble(a0).norm("frobenius")  # noqa
 
     assert round(n - n0, 7) == 0
     assert round(n - nl, 7) == 0
-

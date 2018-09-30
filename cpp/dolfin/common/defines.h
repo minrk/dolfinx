@@ -21,18 +21,13 @@ std::string ufc_signature();
 /// not known)
 std::string git_commit_hash();
 
-/// Return sizeof the dolfin::la_index_t type
-std::size_t sizeof_la_index_t();
-
 /// Return true if DOLFIN is compiled in debugging mode,
 /// i.e., with assertions on
 bool has_debug();
 
-/// Return true if DOLFIN is compiled with MPI
-bool has_mpi();
-
-/// Return true if DOLFIN is compiled with PETSc
-bool has_petsc();
+/// Return true if DOLFIN is configured with PETSc compiled
+/// with scalars represented as complex numbers
+bool has_petsc_complex();
 
 /// Return true if DOLFIN is compiled with SLEPc
 bool has_slepc();
@@ -48,4 +43,4 @@ bool has_hdf5();
 
 /// Return true if DOLFIN is compiled with Parallel HDF5
 bool has_hdf5_parallel();
-}
+} // namespace dolfin

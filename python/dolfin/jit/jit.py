@@ -5,17 +5,16 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from dolfin import pkgconfig
 import numpy
 import hashlib
 import dijitso
 import ffc
-
-import dolfin.cpp as cpp
-from dolfin.cpp import MPI
 from functools import wraps
-from dolfin.parameter import parameters
 
+
+from dolfin import pkgconfig
+from dolfin import cpp
+from dolfin import parameter
 
 # Get DOLFIN pkg-config data
 if pkgconfig.exists("dolfin"):
@@ -47,17 +46,17 @@ def mpi_jit_decorator(local_jit, *args, **kwargs):
 
         # FIXME: should require mpi_comm to be explicit
         # and not default to comm_world?
-        mpi_comm = kwargs.pop("mpi_comm", MPI.comm_world)
+        mpi_comm = kwargs.pop("mpi_comm", cpp.MPI.comm_world)
 
         # Just call JIT compiler when running in serial
-        if MPI.size(mpi_comm) == 1:
+        if cpp.MPI.size(mpi_comm) == 1:
             return local_jit(*args, **kwargs)
 
         # Default status (0 == ok, 1 == fail)
         status = 0
 
         # Compile first on process 0
-        root = MPI.rank(mpi_comm) == 0
+        root = cpp.MPI.rank(mpi_comm) == 0
         if root:
             try:
                 output = local_jit(*args, **kwargs)
@@ -74,7 +73,7 @@ def mpi_jit_decorator(local_jit, *args, **kwargs):
 
         # Wait for the compiling process to finish and get status
         # TODO: Would be better to broadcast the status from root but this works.
-        global_status = MPI.max(mpi_comm, status)
+        global_status = cpp.MPI.max(mpi_comm, status)
 
         if global_status == 0:
             # Success, call jit on all other processes
@@ -101,7 +100,7 @@ def ffc_jit(ufl_form, form_compiler_parameters=None):
 
     # Prepare form compiler parameters with overrides from dolfin and kwargs
     p = ffc.default_jit_parameters()
-    p.update(dict(parameters["form_compiler"]))
+    p.update(dict(parameter.parameters["form_compiler"]))
     p.update(form_compiler_parameters or {})
     return ffc.jit(ufl_form, parameters=p)
 
@@ -124,6 +123,7 @@ _math_header = """
 %s
 
 const double pi = DOLFIN_PI;
+const PetscComplex j = PETSC_i;
 """ % "\n".join("using std::%s;" % mf for mf in _cpp_math_builtins)
 
 
@@ -167,7 +167,7 @@ def compile_class(cpp_data):
         if hasattr(v, '_cpp_object') and isinstance(v._cpp_object, cpp.function.GenericFunction):
             property_str += '*'
 
-    hash_str = str(statements) + str(property_str)
+    hash_str = str(statements) + str(property_str) + cpp.__version__
     module_hash = hashlib.md5(hash_str.encode('utf-8')).hexdigest()
     module_name = "dolfin_" + name + "_" + module_hash
 
@@ -183,7 +183,7 @@ def compile_class(cpp_data):
 
     # Set properties to initial values
     # FIXME: maybe remove from here (do it in Expression instead)
-    for k, v in properties.items():
-        python_object.set_property(k, v)
+    for name, v in properties.items():
+        python_object.set_property(name, v)
 
     return python_object

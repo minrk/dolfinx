@@ -4,9 +4,7 @@
 //
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
-#ifdef HAS_PETSC
 #include <petscversion.h>
-#endif
 
 #ifdef HAS_HDF5
 #include <hdf5.h>
@@ -25,8 +23,6 @@ std::string dolfin::git_commit_hash()
   return std::string(DOLFIN_GIT_COMMIT_HASH);
 }
 //-------------------------------------------------------------------------
-std::size_t dolfin::sizeof_la_index_t() { return sizeof(dolfin::la_index_t); }
-//-------------------------------------------------------------------------
 bool dolfin::has_debug()
 {
 #ifdef DEBUG
@@ -36,18 +32,9 @@ bool dolfin::has_debug()
 #endif
 }
 //-------------------------------------------------------------------------
-bool dolfin::has_mpi()
+bool dolfin::has_petsc_complex()
 {
-#ifdef HAS_MPI
-  return true;
-#else
-  return false;
-#endif
-}
-//-------------------------------------------------------------------------
-bool dolfin::has_petsc()
-{
-#ifdef HAS_PETSC
+#ifdef PETSC_USE_COMPLEX
   return true;
 #else
   return false;

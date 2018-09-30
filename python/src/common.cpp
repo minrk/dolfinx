@@ -38,7 +38,6 @@ void common(py::module& m)
                                                         "Variable base class")
       .def("id", &dolfin::common::Variable::id)
       .def("name", &dolfin::common::Variable::name)
-      .def("label", &dolfin::common::Variable::label)
       .def("rename", &dolfin::common::Variable::rename)
       .def_readwrite("parameters", &dolfin::common::Variable::parameters);
 
@@ -46,7 +45,6 @@ void common(py::module& m)
   m.def("has_debug", &dolfin::has_debug);
   m.def("has_hdf5", &dolfin::has_hdf5);
   m.def("has_hdf5_parallel", &dolfin::has_hdf5_parallel);
-  m.def("has_mpi", &dolfin::has_mpi);
   m.def("has_mpi4py",
         []() {
 #ifdef HAS_PYBIND11_MPI4PY
@@ -58,8 +56,8 @@ void common(py::module& m)
         "Return `True` if DOLFIN is configured with mpi4py");
   m.def("has_parmetis", &dolfin::has_parmetis);
   m.def("has_scotch", &dolfin::has_scotch);
-  m.def("has_petsc", &dolfin::has_petsc,
-        "Return `True` if DOLFIN is configured with PETSc");
+  m.def("has_petsc_complex", &dolfin::has_petsc_complex,
+        "Return True if PETSc scalar is complex.");
   m.def("has_slepc", &dolfin::has_slepc,
         "Return `True` if DOLFIN is configured with SLEPc");
   m.def("has_petsc4py",
@@ -82,35 +80,26 @@ void common(py::module& m)
         "Return `True` if DOLFIN is configured with slepc4py");
   m.def("git_commit_hash", &dolfin::git_commit_hash,
         "Returns git hash for this build.");
-  m.def("sizeof_la_index_t", &dolfin::sizeof_la_index_t);
 
   m.attr("DOLFIN_EPS") = DOLFIN_EPS;
   m.attr("DOLFIN_PI") = DOLFIN_PI;
 
   // dolfin::common::IndexMap
   py::class_<dolfin::common::IndexMap,
-             std::shared_ptr<dolfin::common::IndexMap>>
-      index_map(m, "IndexMap");
-  index_map.def("size", &dolfin::common::IndexMap::size)
+             std::shared_ptr<dolfin::common::IndexMap>>(m, "IndexMap")
+      .def("size_local", &dolfin::common::IndexMap::size_local)
+      .def("size_global", &dolfin::common::IndexMap::size_global)
+      .def("num_ghosts", &dolfin::common::IndexMap::num_ghosts)
       .def("block_size", &dolfin::common::IndexMap::block_size,
            "Return block size")
-      .def("local_range", &dolfin::common::IndexMap::local_range)
-      .def("local_to_global_unowned",
-           [](dolfin::common::IndexMap& self) {
-             return Eigen::Map<const Eigen::Matrix<std::size_t, Eigen::Dynamic,
-                                                   1>>(
-                 self.local_to_global_unowned().data(),
-                 self.local_to_global_unowned().size());
-           },
+      .def("local_range", &dolfin::common::IndexMap::local_range,
+           "Range of indices owned by this map")
+      .def("ghost_owners", &dolfin::common::IndexMap::ghost_owners,
            py::return_value_policy::reference_internal,
-           "Return view into unowned part of local-to-global map");
-
-  // dolfin::common::IndexMap enums
-  py::enum_<dolfin::common::IndexMap::MapSize>(index_map, "MapSize")
-      .value("ALL", dolfin::common::IndexMap::MapSize::ALL)
-      .value("OWNED", dolfin::common::IndexMap::MapSize::OWNED)
-      .value("UNOWNED", dolfin::common::IndexMap::MapSize::UNOWNED)
-      .value("GLOBAL", dolfin::common::IndexMap::MapSize::GLOBAL);
+           "Return owning process for each ghost index")
+      .def("ghosts", &dolfin::common::IndexMap::ghosts,
+           py::return_value_policy::reference_internal,
+           "Return list of ghost indices");
 
   // dolfin::common::Timer
   py::class_<dolfin::common::Timer, std::shared_ptr<dolfin::common::Timer>>(
@@ -122,10 +111,7 @@ void common(py::module& m)
       .def("resume", &dolfin::common::Timer::resume)
       .def("elapsed", &dolfin::common::Timer::elapsed);
 
-  // dolfin::common::Timer enums
-  py::enum_<dolfin::TimingClear>(m, "TimingClear")
-      .value("clear", dolfin::TimingClear::clear)
-      .value("keep", dolfin::TimingClear::keep);
+  // dolfin::common::Timer enum
   py::enum_<dolfin::TimingType>(m, "TimingType")
       .value("wall", dolfin::TimingType::wall)
       .value("system", dolfin::TimingType::system)
@@ -133,16 +119,14 @@ void common(py::module& m)
 
   // dolfin/common free functions
   m.def("timing", &dolfin::timing);
-  m.def("timings",
-        [](dolfin::TimingClear clear, std::vector<dolfin::TimingType> type) {
-          std::set<dolfin::TimingType> _type(type.begin(), type.end());
-          return dolfin::timings(clear, _type);
-        });
-  m.def("list_timings",
-        [](dolfin::TimingClear clear, std::vector<dolfin::TimingType> type) {
-          std::set<dolfin::TimingType> _type(type.begin(), type.end());
-          dolfin::list_timings(clear, _type);
-        });
+  m.def("timings", [](std::vector<dolfin::TimingType> type) {
+    std::set<dolfin::TimingType> _type(type.begin(), type.end());
+    return dolfin::timings(_type);
+  });
+  m.def("list_timings", [](std::vector<dolfin::TimingType> type) {
+    std::set<dolfin::TimingType> _type(type.begin(), type.end());
+    dolfin::list_timings(_type);
+  });
 
   // dolfin::SubSystemsManager
   py::class_<dolfin::common::SubSystemsManager,
@@ -266,4 +250,4 @@ void mpi(py::module& m)
         return dolfin::MPI::avg(comm.get(), value);
       });
 }
-}
+} // namespace dolfin_wrappers

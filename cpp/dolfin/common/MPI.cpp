@@ -12,7 +12,6 @@
 //-----------------------------------------------------------------------------
 dolfin::MPI::Comm::Comm(MPI_Comm comm)
 {
-#ifdef HAS_MPI
   // Duplicate communicator
   if (comm != MPI_COMM_NULL)
   {
@@ -22,9 +21,6 @@ dolfin::MPI::Comm::Comm(MPI_Comm comm)
   }
   else
     _comm = MPI_COMM_NULL;
-#else
-  _comm = comm;
-#endif
 
   std::vector<double> x = {{1.0, 3.0}};
 }
@@ -44,15 +40,15 @@ dolfin::MPI::Comm::~Comm() { free(); }
 //-----------------------------------------------------------------------------
 void dolfin::MPI::Comm::free()
 {
-#ifdef HAS_MPI
   if (_comm != MPI_COMM_NULL)
   {
     int err = MPI_Comm_free(&_comm);
     if (err != MPI_SUCCESS)
+    {
       std::cout << "Error when destroying communicator (MPI_Comm_free)."
                 << std::endl;
+    }
   }
-#endif
 }
 //-----------------------------------------------------------------------------
 std::uint32_t dolfin::MPI::Comm::rank() const
@@ -62,25 +58,18 @@ std::uint32_t dolfin::MPI::Comm::rank() const
 //-----------------------------------------------------------------------------
 std::uint32_t dolfin::MPI::Comm::size() const
 {
-#ifdef HAS_MPI
   int size;
   MPI_Comm_size(_comm, &size);
   return size;
-#else
-  return 1;
-#endif
 }
 //-----------------------------------------------------------------------------
 void dolfin::MPI::Comm::barrier() const
 {
-#ifdef HAS_MPI
   MPI_Barrier(_comm);
-#endif
 }
 //-----------------------------------------------------------------------------
 void dolfin::MPI::Comm::reset(MPI_Comm comm)
 {
-#ifdef HAS_MPI
   if (_comm != MPI_COMM_NULL)
   {
     int err = 0;
@@ -99,15 +88,9 @@ void dolfin::MPI::Comm::reset(MPI_Comm comm)
   {
     // Raise error
   }
-#else
-  _comm = comm;
-#endif
 }
 //-----------------------------------------------------------------------------
 MPI_Comm dolfin::MPI::Comm::comm() const { return _comm; }
-//-----------------------------------------------------------------------------
-
-#ifdef HAS_MPI
 //-----------------------------------------------------------------------------
 dolfin::MPIInfo::MPIInfo() { MPI_Info_create(&info); }
 //-----------------------------------------------------------------------------
@@ -115,51 +98,34 @@ dolfin::MPIInfo::~MPIInfo() { MPI_Info_free(&info); }
 //-----------------------------------------------------------------------------
 MPI_Info& dolfin::MPIInfo::operator*() { return info; }
 //-----------------------------------------------------------------------------
-#endif
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
 std::uint32_t dolfin::MPI::rank(const MPI_Comm comm)
 {
-#ifdef HAS_MPI
   int rank;
   MPI_Comm_rank(comm, &rank);
   return rank;
-#else
-  return 0;
-#endif
 }
 //-----------------------------------------------------------------------------
 std::uint32_t dolfin::MPI::size(const MPI_Comm comm)
 {
-#ifdef HAS_MPI
   int size;
   MPI_Comm_size(comm, &size);
   return size;
-#else
-  return 1;
-#endif
 }
 //-----------------------------------------------------------------------------
 void dolfin::MPI::barrier(const MPI_Comm comm)
 {
-#ifdef HAS_MPI
   MPI_Barrier(comm);
-#endif
 }
 //-----------------------------------------------------------------------------
 std::size_t dolfin::MPI::global_offset(const MPI_Comm comm, std::size_t range,
                                        bool exclusive)
 {
-#ifdef HAS_MPI
   // Compute inclusive or exclusive partial reduction
   std::size_t offset = 0;
   MPI_Scan(&range, &offset, 1, mpi_type<std::size_t>(), MPI_SUM, comm);
   if (exclusive)
     offset -= range;
   return offset;
-#else
-  return 0;
-#endif
 }
 //-----------------------------------------------------------------------------
 std::array<std::int64_t, 2> dolfin::MPI::local_range(const MPI_Comm comm,
@@ -212,7 +178,6 @@ std::uint32_t dolfin::MPI::index_owner(const MPI_Comm comm, std::size_t index,
   return r + (index - r * (n + 1)) / n;
 }
 //-----------------------------------------------------------------------------
-#ifdef HAS_MPI
 template <>
 dolfin::Table dolfin::MPI::all_reduce(const MPI_Comm comm,
                                       const dolfin::Table& table,
@@ -224,7 +189,7 @@ dolfin::Table dolfin::MPI::all_reduce(const MPI_Comm comm,
   if (MPI::size(comm) == 1)
   {
     Table table_all(table);
-    table_all.rename(new_title, table_all.label());
+    table_all.rename(new_title);
     return table_all;
   }
 
@@ -264,8 +229,10 @@ dolfin::Table dolfin::MPI::all_reduce(const MPI_Comm comm,
         y = x;
     };
   else
-    log::dolfin_error("MPI.h", "perform reduction of Table",
-                      "MPI::reduce(comm, table, %d) not implemented", op);
+  {
+    throw std::runtime_error(
+        "Cannot perform reduction of Table. Requested MPI_Op not implemented");
+  }
 
   // Construct dvalues map from obtained data
   std::map<std::array<std::string, 2>, double> dvalues_all;
@@ -304,22 +271,16 @@ dolfin::Table dolfin::MPI::all_reduce(const MPI_Comm comm,
 
   return table_all;
 }
-#endif
 //-----------------------------------------------------------------------------
-#ifdef HAS_MPI
 template <>
 dolfin::Table dolfin::MPI::avg(MPI_Comm comm, const dolfin::Table& table)
 {
   return all_reduce(comm, table, MPI_AVG());
 }
-#endif
 //-----------------------------------------------------------------------------
-#ifdef HAS_MPI
 std::map<MPI_Op, std::string> dolfin::MPI::operation_map
     = {{MPI_SUM, "MPI_SUM"}, {MPI_MAX, "MPI_MAX"}, {MPI_MIN, "MPI_MIN"}};
-#endif
 //-----------------------------------------------------------------------------
-#ifdef HAS_MPI
 MPI_Op dolfin::MPI::MPI_AVG()
 {
   // Return dummy MPI_Op which we identify with average
@@ -332,5 +293,4 @@ MPI_Op dolfin::MPI::MPI_AVG()
   }
   return op;
 }
-#endif
 //-----------------------------------------------------------------------------

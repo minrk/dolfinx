@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2015 Anders Logg and Garth N. Wells
+// Copyright (C) 2007-2018 Anders Logg and Garth N. Wells
 //
 // This file is part of DOLFIN (https://www.fenicsproject.org)
 //
@@ -6,21 +6,27 @@
 
 #pragma once
 
-#include "DofMapBuilder.h"
 #include "GenericDofMap.h"
 #include <Eigen/Dense>
+#include <array>
 #include <cstdlib>
-#include <dolfin/common/IndexMap.h>
 #include <dolfin/common/types.h>
-#include <map>
 #include <memory>
-#include <ufc.h>
+#include <set>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+struct ufc_dofmap;
+
 namespace dolfin
 {
+
+namespace common
+{
+class IndexMap;
+}
+
 namespace la
 {
 class PETScVector;
@@ -30,7 +36,7 @@ namespace mesh
 {
 class Mesh;
 class SubDomain;
-}
+} // namespace mesh
 
 namespace fem
 {
@@ -38,7 +44,7 @@ namespace fem
 /// Degree-of-freedom map
 
 /// This class handles the mapping of degrees of freedom. It builds
-/// a dof map based on a ufc::dofmap on a specific mesh. It will
+/// a dof map based on a ufc_ofmap on a specific mesh. It will
 /// reorder the dofs when running in parallel. Sub-dofmaps, both
 /// views and copies, are supported.
 
@@ -47,22 +53,11 @@ class DofMap : public GenericDofMap
 public:
   /// Create dof map on mesh (mesh is not stored)
   ///
-  /// @param[in] ufc_dofmap (ufc::dofmap)
-  ///         The ufc::dofmap.
+  /// @param[in] ufc_dofmap (ufc_dofmap)
+  ///         The ufc_dofmap.
   /// @param[in] mesh (mesh::Mesh&)
   ///         The mesh.
-  DofMap(std::shared_ptr<const ufc::dofmap> ufc_dofmap, const mesh::Mesh& mesh);
-
-  /// Create a periodic dof map on mesh (mesh is not stored)
-  ///
-  /// @param[in] ufc_dofmap (ufc::dofmap)
-  ///         The ufc::dofmap.
-  /// @param[in] mesh (mesh::Mesh)
-  ///         The mesh.
-  /// @param[in] constrained_domain (mesh::SubDomain)
-  ///         The subdomain marking the constrained (tied) boundaries.
-  DofMap(std::shared_ptr<const ufc::dofmap> ufc_dofmap, const mesh::Mesh& mesh,
-         std::shared_ptr<const mesh::SubDomain> constrained_domain);
+  DofMap(std::shared_ptr<const ufc_dofmap> ufc_dofmap, const mesh::Mesh& mesh);
 
 private:
   // Create a sub-dofmap (a view) from parent_dofmap
@@ -73,22 +68,27 @@ private:
   DofMap(std::unordered_map<std::size_t, std::size_t>& collapsed_map,
          const DofMap& dofmap_view, const mesh::Mesh& mesh);
 
-  // Copy constructor
-  DofMap(const DofMap& dofmap) = default;
-
 public:
+  // Copy constructor
+  DofMap(const DofMap& dofmap) = delete;
+
   /// Move constructor
   DofMap(DofMap&& dofmap) = default;
 
   /// Destructor
   ~DofMap() = default;
 
+  DofMap& operator=(const DofMap& dofmap) = delete;
+
+  /// Move assignment
+  DofMap& operator=(DofMap&& dofmap) = default;
+
   /// True iff dof map is a view into another map
   ///
   /// @returns bool
   ///         True if the dof map is a sub-dof map (a view into
   ///         another map).
-  bool is_view() const { return _is_view; }
+  bool is_view() const { return _ufc_offset >= 0; }
 
   /// Return the dimension of the global finite element function
   /// space. Use index_map()->size() to get the local dimension.
@@ -124,11 +124,14 @@ public:
   ///         Number of dofs associated with given entity dimension
   virtual std::size_t num_entity_dofs(std::size_t entity_dim) const;
 
-  /// Return number of facet dofs
+  /// Return the number of closure dofs for a given entity dimension
+  /// s
+  /// @param     entity_dim (std::size_t)
+  ///         Entity dimension
   ///
   /// @return     std::size_t
-  ///         The number of facet dofs.
-  std::size_t num_facet_dofs() const;
+  ///         Number of dofs associated with closure of given entity dimension
+  virtual std::size_t num_entity_closure_dofs(std::size_t entity_dim) const;
 
   /// Return the ownership range (dofs in this range are owned by
   /// this process)
@@ -136,16 +139,6 @@ public:
   /// @return   std::array<std::size_t, 2>
   ///         The ownership range.
   std::array<std::int64_t, 2> ownership_range() const;
-
-  /// Return map from nonlocal dofs that appear in local dof map to
-  /// owning process
-  ///
-  /// @return     std::vector<std::uint32_t>
-  ///         The map from non-local dofs.
-  const std::vector<int>& off_process_owner() const
-  {
-    return _index_map->block_off_process_owner();
-  }
 
   /// Return map from all shared nodes to the sharing processes (not
   /// including the current process) that share it.
@@ -165,48 +158,43 @@ public:
   /// @param     cell_index (std::size_t)
   ///         The cell index.
   ///
-  /// @return         ArrayView<const dolfin::la_index_t>
-  Eigen::Map<const Eigen::Array<dolfin::la_index_t, Eigen::Dynamic, 1>>
+  /// @return         Eigen::Map<const Eigen::Array<PetscInt,
+  /// Eigen::Dynamic, 1>>
+  Eigen::Map<const Eigen::Array<PetscInt, Eigen::Dynamic, 1>>
   cell_dofs(std::size_t cell_index) const
   {
     const std::size_t index = cell_index * _cell_dimension;
     assert(index + _cell_dimension <= _dofmap.size());
-    return Eigen::Map<const Eigen::Array<dolfin::la_index_t, Eigen::Dynamic,
-                                         1>>(&_dofmap[index], _cell_dimension);
+    return Eigen::Map<const Eigen::Array<PetscInt, Eigen::Dynamic, 1>>(
+        &_dofmap[index], _cell_dimension);
   }
 
-  /// Tabulate local-local facet dofs
+  /// Tabulate local-local closure dofs on entity of cell
   ///
-  /// @param    element_dofs (std::size_t)
-  ///         Degrees of freedom on a single element.
-  /// @param    cell_facet_index (std::size_t)
-  ///         The local facet index on the cell.
-  void tabulate_facet_dofs(std::vector<int64_t>& element_dofs,
-                           std::size_t cell_facet_index) const;
-
-  /// Tabulate local-local mapping of dofs on entity (dim, local_entity)
-  ///
-  /// @param    element_dofs (std::size_t)
-  ///         Degrees of freedom on a single element.
   /// @param   entity_dim (std::size_t)
   ///         The entity dimension.
   /// @param    cell_entity_index (std::size_t)
   ///         The local entity index on the cell.
-  void tabulate_entity_dofs(std::vector<int64_t>& element_dofs,
-                            std::size_t entity_dim,
-                            std::size_t cell_entity_index) const;
+  /// @return     Eigen::Array<int, Eigen::Dynamic, 1>
+  ///         Degrees of freedom on a single element.
+  Eigen::Array<int, Eigen::Dynamic, 1>
+  tabulate_entity_closure_dofs(std::size_t entity_dim,
+                               std::size_t cell_entity_index) const;
+
+  /// Tabulate local-local mapping of dofs on entity of cell
+  ///
+  /// @param   entity_dim (std::size_t)
+  ///         The entity dimension.
+  /// @param    cell_entity_index (std::size_t)
+  ///         The local entity index on the cell.
+  /// @return     Eigen::Array<int, Eigen::Dynamic, 1>
+  ///         Degrees of freedom on a single element.
+  Eigen::Array<int, Eigen::Dynamic, 1>
+  tabulate_entity_dofs(std::size_t entity_dim,
+                       std::size_t cell_entity_index) const;
 
   /// Tabulate globally supported dofs
-  ///
-  /// @param    element_dofs (std::size_t)
-  ///         Degrees of freedom.
-  void tabulate_global_dofs(std::vector<std::size_t>& element_dofs) const
-  {
-    assert(_global_nodes.empty() || block_size() == 1);
-    element_dofs.resize(_global_nodes.size());
-    std::copy(_global_nodes.cbegin(), _global_nodes.cend(),
-              element_dofs.begin());
-  }
+  Eigen::Array<std::size_t, Eigen::Dynamic, 1> tabulate_global_dofs() const;
 
   /// Extract subdofmap component
   ///
@@ -217,7 +205,7 @@ public:
   ///
   /// @return     DofMap
   ///         The subdofmap component.
-  std::shared_ptr<GenericDofMap>
+  std::unique_ptr<GenericDofMap>
   extract_sub_dofmap(const std::vector<std::size_t>& component,
                      const mesh::Mesh& mesh) const;
 
@@ -230,9 +218,9 @@ public:
   ///
   /// @return    DofMap
   ///         The collapsed dofmap.
-  std::shared_ptr<GenericDofMap>
-  collapse(std::unordered_map<std::size_t, std::size_t>& collapsed_map,
-           const mesh::Mesh& mesh) const;
+  std::pair<std::shared_ptr<GenericDofMap>,
+            std::unordered_map<std::size_t, std::size_t>>
+  collapse(const mesh::Mesh& mesh) const;
 
   /// Set dof entries in vector to a specified value. Parallel layout
   /// of vector must be consistent with dof map range. This
@@ -241,19 +229,16 @@ public:
   ///
   /// @param  x (la::PETScVector)
   ///         The vector to set.
-  /// @param  value (double)
+  /// @param  value (PetscScalar)
   ///         The value to set.
-  void set(la::PETScVector& x, double value) const;
+  void set(la::PETScVector& x, PetscScalar value) const;
 
   /// Return the map (const access)
-  std::shared_ptr<const common::IndexMap> index_map() const
-  {
-    return _index_map;
-  }
+  std::shared_ptr<const common::IndexMap> index_map() const;
 
   /// Return the block size for dof maps with components, typically
   /// used for vector valued functions.
-  int block_size() const { return _index_map->block_size(); }
+  int block_size() const;
 
   /// Return informal string representation (pretty-print)
   ///
@@ -265,55 +250,37 @@ public:
   std::string str(bool verbose) const;
 
 private:
-  // Friends
-  friend class fem::DofMapBuilder;
-
   // Check that mesh provides the entities needed by dofmap
-  static void check_provided_entities(const ufc::dofmap& dofmap,
+  static void check_provided_entities(const ufc_dofmap& dofmap,
                                       const mesh::Mesh& mesh);
 
   // Cell-local-to-dof map (dofs for cell dofmap[i])
-  std::vector<dolfin::la_index_t> _dofmap;
+  std::vector<PetscInt> _dofmap;
 
   // List of global nodes
   std::set<std::size_t> _global_nodes;
 
   // Cell dimension (fixed for all cells)
-  std::size_t _cell_dimension;
+  int _cell_dimension;
 
   // UFC dof map
-  std::shared_ptr<const ufc::dofmap> _ufc_dofmap;
+  std::shared_ptr<const ufc_dofmap> _ufc_dofmap;
 
-  // Number global mesh entities. This is usually the same as what
-  // is reported by the mesh, but will differ for dofmaps
-  // constrained, e.g. dofmaps with periodic bcs. It is stored in
-  // order to compute the global dimension of dofmaps that are
-  // constructed from a sub-dofmap.
-  std::vector<int64_t> _num_mesh_entities_global;
-
-  // Map from UFC dof numbering to renumbered dof (ufc_dof ->
-  // actual_dof, both using local indices)
-  std::vector<int> _ufc_local_to_local;
-
-  // Flag to determine if the DofMap is a view
-  bool _is_view;
-
-  // Global dimension. Note that this may differ from the global
-  // dimension of the UFC dofmap if the function space is periodic.
+  // Global dimension
   std::int64_t _global_dimension;
 
-  // UFC dof map offset
-  std::size_t _ufc_offset;
+  // UFC dof map offset (< 0 if not a view)
+  std::int64_t _ufc_offset;
 
   // Object containing information about dof distribution across
   // processes
-  std::shared_ptr<common::IndexMap> _index_map;
+  std::shared_ptr<const common::IndexMap> _index_map;
 
-  // List of processes that share a given dof
+  // Processes that share a given dof
   std::unordered_map<int, std::vector<int>> _shared_nodes;
 
-  // Neighbours (processes that we share dofs with)
+  // Processes that this dofmap shares dofs with
   std::set<int> _neighbours;
 };
-}
-}
+} // namespace fem
+} // namespace dolfin

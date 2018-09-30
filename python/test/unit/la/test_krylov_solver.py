@@ -7,16 +7,93 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import pytest
-from dolfin import *
-from dolfin_utils.test import skip_if_not_PETSc, skip_in_parallel, pushpop_parameters
+
+from dolfin import (MPI, Constant, DirichletBC, Function, FunctionSpace,
+                    Identity, TestFunction, TrialFunction, UnitSquareMesh,
+                    VectorFunctionSpace, cpp, dot, dx, fem, grad, inner, sym,
+                    tr)
+from dolfin.fem import assemble
+from dolfin.fem.assembling import assemble_system
+from dolfin.la import (PETScKrylovSolver, PETScMatrix, PETScOptions,
+                       PETScVector, VectorSpaceBasis)
 
 
-@skip_if_not_PETSc
-def test_krylov_samg_solver_elasticity(pushpop_parameters):
+def test_krylov_solver_lu():
+
+    mesh = UnitSquareMesh(MPI.comm_world, 12, 12)
+    V = FunctionSpace(mesh, "Lagrange", 1)
+    u, v = TrialFunction(V), TestFunction(V)
+
+    a = Constant(1.0) * inner(u, v) * dx
+    L = inner(Constant(1.0), v) * dx
+    A = assemble(a)
+    b = assemble(L)
+
+    norm = 13.0
+
+    solver = PETScKrylovSolver(mesh.mpi_comm())
+    solver.set_options_prefix("test_lu_")
+    PETScOptions.set("test_lu_ksp_type", "preonly")
+    PETScOptions.set("test_lu_pc_type", "lu")
+    solver.set_from_options()
+    x = PETScVector()
+    solver.set_operator(A)
+    solver.solve(x, b)
+
+    # *Tight* tolerance for LU solves
+    assert round(x.norm(cpp.la.Norm.l2) - norm, 12) == 0
+
+
+@pytest.mark.skip
+def test_krylov_reuse_pc_lu():
+    """Test that LU re-factorisation is only performed after
+    set_operator(A) is called"""
+
+    # Test requires PETSc version 3.5 or later. Use petsc4py to check
+    # version number.
+    try:
+        from petsc4py import PETSc
+    except ImportError:
+        pytest.skip("petsc4py required to check PETSc version")
+    else:
+        if not PETSc.Sys.getVersion() >= (3, 5, 0):
+            pytest.skip("PETSc version must be 3.5  of higher")
+
+    mesh = UnitSquareMesh(MPI.comm_world, 12, 12)
+    V = FunctionSpace(mesh, "Lagrange", 1)
+    u, v = TrialFunction(V), TestFunction(V)
+
+    a = Constant(1.0) * u * v * dx
+    L = Constant(1.0) * v * dx
+    assembler = fem.Assembler(a, L)
+    A = assembler.assemble_matrix()
+    b = assembler.assemble_vector()
+    norm = 13.0
+
+    solver = PETScKrylovSolver(mesh.mpi_comm())
+    solver.set_options_prefix("test_lu_")
+    PETScOptions.set("test_lu_ksp_type", "preonly")
+    PETScOptions.set("test_lu_pc_type", "lu")
+    solver.set_from_options()
+    solver.set_operator(A)
+    x = PETScVector(mesh.mpi_comm())
+    solver.solve(x, b)
+    assert round(x.norm(cpp.la.Norm.l2) - norm, 10) == 0
+
+    assembler = fem.assemble.Assembler(Constant(0.5) * u * v * dx, L)
+    assembler.assemble(A)
+    x = PETScVector(mesh.mpi_comm())
+    solver.solve(x, b)
+    assert round(x.norm(cpp.la.Norm.l2) - 2.0 * norm, 10) == 0
+
+    solver.set_operator(A)
+    solver.solve(x, b)
+    assert round(x.norm(cpp.la.Norm.l2) - 2.0 * norm, 10) == 0
+
+
+@pytest.mark.skip
+def test_krylov_samg_solver_elasticity():
     "Test PETScKrylovSolver with smoothed aggregation AMG"
-
-    # Set backend
-    parameters["linear_algebra_backend"] = "PETSc"
 
     def build_nullspace(V, x):
         """Function to build null space for 2D elasticity"""
@@ -43,15 +120,16 @@ def test_krylov_samg_solver_elasticity(pushpop_parameters):
         # Elasticity parameters
         E = 1.0e9
         nu = 0.3
-        mu = E/(2.0*(1.0 + nu))
-        lmbda = E*nu/((1.0 + nu)*(1.0 - 2.0*nu))
+        mu = E / (2.0 * (1.0 + nu))
+        lmbda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
 
         # Stress computation
         def sigma(v):
-            return 2.0*mu*sym(grad(v)) + lmbda*tr(sym(grad(v)))*Identity(2)
+            return 2.0 * mu * sym(grad(v)) + lmbda * tr(sym(
+                grad(v))) * Identity(2)
 
         # Define problem
-        mesh = UnitSquareMesh(N, N)
+        mesh = UnitSquareMesh(MPI.comm_world, N, N)
         V = VectorFunctionSpace(mesh, 'Lagrange', 1)
         bc = DirichletBC(V, Constant((0.0, 0.0)),
                          lambda x, on_boundary: on_boundary)
@@ -59,7 +137,7 @@ def test_krylov_samg_solver_elasticity(pushpop_parameters):
         v = TestFunction(V)
 
         # Forms
-        a, L = inner(sigma(u), grad(v))*dx, dot(Constant((1.0, 1.0)), v)*dx
+        a, L = inner(sigma(u), grad(v)) * dx, dot(Constant((1.0, 1.0)), v) * dx
 
         # Assemble linear algebra objects
         A, b = assemble_system(a, L, bc)
@@ -71,15 +149,14 @@ def test_krylov_samg_solver_elasticity(pushpop_parameters):
         null_space = build_nullspace(V, u.vector())
 
         # Attached near-null space to matrix
-        as_backend_type(A).set_near_nullspace(null_space)
+        A.set_near_nullspace(null_space)
 
         # Test that basis is orthonormal
         assert null_space.is_orthonormal()
 
         # Create PETSC smoothed aggregation AMG preconditioner, and
         # create CG solver
-        pc = PETScPreconditioner(method)
-        solver = PETScKrylovSolver("cg", pc)
+        solver = PETScKrylovSolver("cg", method)
 
         # Set matrix operator
         solver.set_operator(A)
@@ -109,27 +186,27 @@ def test_krylov_samg_solver_elasticity(pushpop_parameters):
             assert niter < 18
 
 
-@skip_if_not_PETSc
+@pytest.mark.skip
 def test_krylov_reuse_pc():
     "Test preconditioner re-use with PETScKrylovSolver"
 
     # Define problem
-    mesh = UnitSquareMesh(8, 8)
+    mesh = UnitSquareMesh(MPI.comm_world, 8, 8)
     V = FunctionSpace(mesh, 'Lagrange', 1)
     bc = DirichletBC(V, Constant(0.0), lambda x, on_boundary: on_boundary)
     u = TrialFunction(V)
     v = TestFunction(V)
 
     # Forms
-    a, L = inner(grad(u), grad(v))*dx, dot(Constant(1.0), v)*dx
+    a, L = inner(grad(u), grad(v)) * dx, dot(Constant(1.0), v) * dx
 
     A, P = PETScMatrix(), PETScMatrix()
     b = PETScVector()
 
     # Assemble linear algebra objects
-    assemble(a, tensor=A)
-    assemble(a, tensor=P)
-    assemble(L, tensor=b)
+    assemble(a, tensor=A)  # noqa
+    assemble(a, tensor=P)  # noqa
+    assemble(L, tensor=b)  # noqa
 
     # Apply boundary conditions
     bc.apply(A)
@@ -146,8 +223,8 @@ def test_krylov_reuse_pc():
 
     # Change preconditioner matrix (bad matrix) and solve (PC will be
     # updated)
-    a_p = u*v*dx
-    assemble(a_p, tensor=P)
+    a_p = u * v * dx
+    assemble(a_p, tensor=P)  # noqa
     bc.apply(P)
     x = PETScVector()
     num_iter_mod = solver.solve(x, b)
@@ -156,7 +233,7 @@ def test_krylov_reuse_pc():
     # Change preconditioner matrix (good matrix) and solve (PC will be
     # updated)
     a_p = a
-    assemble(a_p, tensor=P)
+    assemble(a_p, tensor=P)  # noqa
     bc.apply(P)
     x = PETScVector()
     num_iter = solver.solve(x, b)
@@ -165,8 +242,8 @@ def test_krylov_reuse_pc():
     # Change preconditioner matrix (bad matrix) and solve (PC will not
     # be updated)
     solver.set_reuse_preconditioner(True)
-    a_p = u*v*dx
-    assemble(a_p, tensor=P)
+    a_p = u * v * dx
+    assemble(a_p, tensor=P)  # noqa
     bc.apply(P)
     x = PETScVector()
     num_iter = solver.solve(x, b)
@@ -177,65 +254,3 @@ def test_krylov_reuse_pc():
     x = PETScVector()
     num_iter = solver.solve(x, b)
     assert num_iter == num_iter_mod
-
-
-def test_krylov_tpetra():
-    if not has_linear_algebra_backend("Tpetra"):
-        return
-
-    mesh = UnitCubeMesh(10, 10, 10)
-    Q = FunctionSpace(mesh, "CG", 1)
-    v = TestFunction(Q)
-    u = TrialFunction(Q)
-    a = dot(grad(u), grad(v))*dx
-    L = v*dx
-
-    def bound(x):
-        return x[0] == 0
-
-    bc = DirichletBC(Q, Constant(0.0), bound)
-
-    A = TpetraMatrix()
-    b = TpetraVector()
-    assemble(a, A)
-    assemble(L, b)
-    bc.apply(A)
-    bc.apply(b)
-
-    mp = MueluPreconditioner()
-    mlp = mp.parameters
-    mlp['verbosity'] = 'extreme'
-    mlp.add("max_levels", 10)
-    mlp.add("coarse:_max_size", 10)
-    mlp.add("coarse:_type", "KLU2")
-    mlp.add("multigrid_algorithm", "sa")
-    mlp.add("aggregation:_type", "uncoupled")
-    mlp.add("aggregation:_min_agg_size", 3)
-    mlp.add("aggregation:_max_agg_size", 7)
-
-    pre_paramList = Parameters("smoother:_pre_params")
-    pre_paramList.add("relaxation:_type", "Symmetric Gauss-Seidel")
-    pre_paramList.add("relaxation:_sweeps", 1)
-    pre_paramList.add("relaxation:_damping_factor", 0.6)
-    mlp.add("smoother:_pre_type", "RELAXATION")
-    mlp.add(pre_paramList)
-
-    post_paramList = Parameters("smoother:_post_params")
-    post_paramList.add("relaxation:_type", "Symmetric Gauss-Seidel")
-    post_paramList.add("relaxation:_sweeps", 1)
-    post_paramList.add("relaxation:_damping_factor", 0.9)
-    mlp.add("smoother:_post_type", "RELAXATION")
-    mlp.add(post_paramList)
-
-    solver = BelosKrylovSolver("cg", mp)
-    solver.parameters['relative_tolerance'] = 1e-8
-    solver.parameters['monitor_convergence'] = False
-    solver.parameters['belos'].add("Maximum_Iterations", 150)
-
-    solver.set_operator(A)
-
-    u = TpetraVector()
-    n_iter = solver.solve(u, b)
-
-    # Number of iterations should be around 15
-    assert n_iter < 50

@@ -37,11 +37,6 @@ public:
     // Print standard output on all processes
     p.add("std_out_all_processes", true);
 
-    //-- dof ordering
-
-    // DOF reordering when running in serial
-    p.add("reorder_dofs_serial", true);
-
     // Add dof ordering library
     std::string default_dof_ordering_library = "Boost";
 #ifdef HAS_SCOTCH
@@ -51,9 +46,6 @@ public:
           {"Boost", "random", "SCOTCH"});
 
     //-- Meshes
-
-    // Mesh ghosting type
-    p.add("ghost_mode", "none", {"shared_facet", "shared_vertex", "none"});
 
     // Mesh ordering via SCOTCH and GPS
     p.add("reorder_cells_gps", false);
@@ -74,24 +66,11 @@ public:
     p.add("partitioning_approach", "PARTITION",
           {"PARTITION", "REPARTITION", "REFINE"});
 
-#ifdef HAS_PARMETIS
-    // Repartitioning parameter, determines how strongly to hold on
-    // to cells when shifting between processes
-    p.add("ParMETIS_repartitioning_weight", 1000.0);
-#endif
-
-//-- Linear algebra
-
-#ifdef HAS_PETSC
-    p.add("use_petsc_signal_handler", false);
-#endif
-
     return p;
   }
 };
 
 /// The global parameter database
 extern GlobalParameters parameters;
-}
-}
-
+} // namespace parameter
+} // namespace dolfin

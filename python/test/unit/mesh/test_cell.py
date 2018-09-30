@@ -8,7 +8,7 @@ import pytest
 import numpy
 
 from dolfin import (UnitCubeMesh, UnitIntervalMesh, UnitSquareMesh,
-                    MPI, Cell, Mesh, CellType, Point)
+                    MPI, Cell, Mesh, CellType, Point, cpp)
 from dolfin_utils.test import skip_in_parallel, skip_in_release
 
 
@@ -18,8 +18,8 @@ def test_distance_interval():
     mesh = UnitIntervalMesh(MPI.comm_self, 1)
     cell = Cell(mesh, 0)
 
-    assert round(cell.distance(Point(-1.0)) - 1.0, 7) == 0
-    assert round(cell.distance(Point(0.5)) - 0.0, 7) == 0
+    assert round(cell.distance(Point(-1.0)._cpp_object) - 1.0, 7) == 0
+    assert round(cell.distance(Point(0.5)._cpp_object) - 0.0, 7) == 0
 
 
 @skip_in_parallel
@@ -28,9 +28,9 @@ def test_distance_triangle():
     mesh = UnitSquareMesh(MPI.comm_self, 1, 1)
     cell = Cell(mesh, 1)
 
-    assert round(cell.distance(Point(-1.0, -1.0)) - numpy.sqrt(2), 7) == 0
-    assert round(cell.distance(Point(-1.0, 0.5)) - 1, 7) == 0
-    assert round(cell.distance(Point(0.5, 0.5)) - 0.0, 7) == 0
+    assert round(cell.distance(Point(-1.0, -1.0)._cpp_object) - numpy.sqrt(2), 7) == 0
+    assert round(cell.distance(Point(-1.0, 0.5)._cpp_object) - 1, 7) == 0
+    assert round(cell.distance(Point(0.5, 0.5)._cpp_object) - 0.0, 7) == 0
 
 
 @skip_in_parallel
@@ -39,9 +39,9 @@ def test_distance_tetrahedron():
     mesh = UnitCubeMesh(MPI.comm_self, 1, 1, 1)
     cell = Cell(mesh, 5)
 
-    assert round(cell.distance(Point(-1.0, -1.0, -1.0))-numpy.sqrt(3), 7) == 0
-    assert round(cell.distance(Point(-1.0, 0.5, 0.5)) - 1, 7) == 0
-    assert round(cell.distance(Point(0.5, 0.5, 0.5)) - 0.0, 7) == 0
+    assert round(cell.distance(Point(-1.0, -1.0, -1.0)._cpp_object) - numpy.sqrt(3), 7) == 0
+    assert round(cell.distance(Point(-1.0, 0.5, 0.5)._cpp_object) - 1, 7) == 0
+    assert round(cell.distance(Point(0.5, 0.5, 0.5)._cpp_object) - 0.0, 7) == 0
 
 
 @pytest.mark.xfail
@@ -72,12 +72,13 @@ def test_volume_quadrilateralR2():
 
 
 @pytest.mark.parametrize('coordinates', [[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]],
-    [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 1.0]]])
+                                         [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 1.0]]])
 def test_volume_quadrilateralR3(coordinates):
 
     mesh = Mesh(MPI.comm_world, CellType.Type.quadrilateral,
                 numpy.array(coordinates, dtype=numpy.float64),
-                numpy.array([[0,1,2,3]], dtype=numpy.int32))
+                numpy.array([[0, 1, 2, 3]], dtype=numpy.int32), [],
+                cpp.mesh.GhostMode.none)
 
     mesh.init()
     cell = Cell(mesh, 0)
@@ -86,7 +87,7 @@ def test_volume_quadrilateralR3(coordinates):
 
 
 @pytest.mark.parametrize('scaling', [1e0, 1e-5, 1e-10, 1e-15, 1e-20, 1e-30,
-    1e5, 1e10, 1e15, 1e20, 1e30])
+                                     1e5, 1e10, 1e15, 1e20, 1e30])
 def test_volume_quadrilateral_coplanarity_check_1(scaling):
 
     with pytest.raises(RuntimeError) as error:
@@ -94,15 +95,17 @@ def test_volume_quadrilateral_coplanarity_check_1(scaling):
         # vertex is distorted so that the vertices are clearly non
         # coplanar
         mesh = Mesh(MPI.comm_world, CellType.Type.quadrilateral,
-                    numpy.array([[scaling, 0.5 * scaling, 0.6 *
-                                  scaling], [0.0, scaling, 0.0], [0.0, 0.0,
-                                                                  scaling], [0.0, scaling, scaling]],
-                                dtype=numpy.float64), numpy.array([[0, 1, 2, 3]],
-                                                                  dtype=numpy.int32))
+                    numpy.array([[scaling, 0.5 * scaling, 0.6 * scaling],
+                                 [0.0, scaling, 0.0],
+                                 [0.0, 0.0, scaling],
+                                 [0.0, scaling, scaling]],
+                                dtype=numpy.float64),
+                    numpy.array([[0, 1, 2, 3]], dtype=numpy.int32), [],
+                    cpp.mesh.GhostMode.none)
 
         mesh.init()
         cell = Cell(mesh, 0)
-        volume = cell.volume()
+        cell.volume()
 
     assert "are not coplanar" in str(error.value)
 
@@ -119,10 +122,11 @@ def test_volume_quadrilateral_coplanarity_check_2(scaling):
         mesh = Mesh(MPI.comm_world, CellType.Type.quadrilateral,
                     numpy.array([[1.0, 0.5, 0.6], [0.0, scaling, 0.0],
                                  [0.0, 0.0, scaling], [0.0, 1.0, 1.0]],
-                                dtype=numpy.float64), numpy.array([[0, 1, 2, 3]],
-                                                                  dtype=numpy.int32))
+                                dtype=numpy.float64),
+                    numpy.array([[0, 1, 2, 3]], dtype=numpy.int32), [],
+                    cpp.mesh.GhostMode.none)
         mesh.init()
         cell = Cell(mesh, 0)
-        volume = cell.volume()
+        cell.volume()
 
     assert "are not coplanar" in str(error.value)

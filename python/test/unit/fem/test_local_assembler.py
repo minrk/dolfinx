@@ -6,67 +6,68 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
+import pytest
 import numpy
-from dolfin import *
-from dolfin_utils.test import set_parameters_fixture
+from dolfin import (UnitIntervalMesh, UnitSquareMesh,
+                    Constant, Cell, TestFunction, TrialFunction, MPI, Cells, dx,
+                    ds, dS, dot, Form, FunctionSpace, VectorFunctionSpace,
+                    Expression, FacetNormal)
+from dolfin.fem.assembling import assemble_local
 
 
-ghost_mode = set_parameters_fixture("ghost_mode", ["shared_facet"])
-
-
+@pytest.mark.skip
 def test_local_assembler_1D():
-    mesh = UnitIntervalMesh(20)
+    mesh = UnitIntervalMesh(MPI.comm_world, 20)
     V = FunctionSpace(mesh, 'CG', 1)
     u = TrialFunction(V)
     v = TestFunction(V)
     c = Cell(mesh, 0)
 
-    a_scalar = Constant(1)*dx(domain=mesh)
-    a_vector = v*dx
-    a_matrix = u*v*dx
+    a_scalar = Constant(1) * dx(domain=mesh)
+    a_vector = v * dx
+    a_matrix = u * v * dx
 
     A_scalar = assemble_local(a_scalar, c)
     A_vector = assemble_local(a_vector, c)
     A_matrix = assemble_local(a_matrix, c)
 
     assert isinstance(A_scalar, float)
-    assert near(A_scalar, 0.05)
+    assert numpy.isclose(A_scalar, 0.05)
 
     assert isinstance(A_vector, numpy.ndarray)
     assert A_vector.shape == (2,)
-    assert near(A_vector[0], 0.025)
-    assert near(A_vector[1], 0.025)
+    assert numpy.isclose(A_vector[0], 0.025)
+    assert numpy.isclose(A_vector[1], 0.025)
 
     assert isinstance(A_matrix, numpy.ndarray)
     assert A_matrix.shape == (2, 2)
-    assert near(A_matrix[0, 0], 1/60)
-    assert near(A_matrix[0, 1], 1/120)
-    assert near(A_matrix[1, 0], 1/120)
-    assert near(A_matrix[1, 1], 1/60)
+    assert numpy.isclose(A_matrix[0, 0], 1 / 60)
+    assert numpy.isclose(A_matrix[0, 1], 1 / 120)
+    assert numpy.isclose(A_matrix[1, 0], 1 / 120)
+    assert numpy.isclose(A_matrix[1, 1], 1 / 60)
 
 
-def test_local_assembler_on_facet_integrals(ghost_mode):
-    mesh = UnitSquareMesh(4, 4, 'right')
-    Vcg = FunctionSpace(mesh, 'CG', 1)
+@pytest.mark.skip
+def test_local_assembler_on_facet_integrals():
+    mesh = UnitSquareMesh(MPI.comm_world, 4, 4, 'right')
     Vdg = FunctionSpace(mesh, 'DG', 0)
     Vdgt = FunctionSpace(mesh, 'DGT', 1)
 
     v = TestFunction(Vdgt)
-    n = FacetNormal(mesh)
 
     # Initialize DG function "w" in discontinuous pattern
     w = Expression('(1.0 + pow(x[0], 2.2) + 1/(0.1 + pow(x[1], 3)))*300.0',
                    element=Vdg.ufl_element())
 
     # Define form that tests that the correct + and - values are used
-    L = w('-')*v('+')*dS
+    L = w('-') * v('+') * dS
 
     # Compile form. This is collective
     L = Form(L)
 
     # Get global cell 10. This will return a cell only on one of the
     # processes
-    c = get_cell_at(mesh, 5/12, 1/3, 0)
+    c = get_cell_at(mesh, 5 / 12, 1 / 3, 0)
 
     if c:
         # Assemble locally on the selected cell
@@ -74,8 +75,7 @@ def test_local_assembler_on_facet_integrals(ghost_mode):
 
         # Compare to values from phonyx (fully independent
         # implementation)
-        b_phonyx = numpy.array([266.55210302, 266.55210302, 365.49000122,
-                                365.49000122,          0.0,          0.0])
+        b_phonyx = numpy.array([266.55210302, 266.55210302, 365.49000122, 365.49000122, 0.0, 0.0])
         error = sum((b_e - b_phonyx)**2)**0.5
         error = float(error)  # MPI.max does strange things to numpy.float64
 
@@ -86,8 +86,9 @@ def test_local_assembler_on_facet_integrals(ghost_mode):
     assert error < 1e-8
 
 
-def test_local_assembler_on_facet_integrals2(ghost_mode):
-    mesh = UnitSquareMesh(4, 4)
+@pytest.mark.skip
+def test_local_assembler_on_facet_integrals2():
+    mesh = UnitSquareMesh(MPI.comm_world, 4, 4)
     Vu = VectorFunctionSpace(mesh, 'DG', 1)
     Vv = FunctionSpace(mesh, 'DGT', 1)
     u = TrialFunction(Vu)
@@ -95,25 +96,25 @@ def test_local_assembler_on_facet_integrals2(ghost_mode):
     n = FacetNormal(mesh)
 
     # Define form
-    a = dot(u, n)*v*ds
+    a = dot(u, n) * v * ds
     for R in '+-':
-        a += dot(u(R), n(R))*v(R)*dS
+        a += dot(u(R), n(R)) * v(R) * dS
 
     # Compile form. This is collective
     a = Form(a)
 
     # Get global cell 0. This will return a cell only on one of the
     # processes
-    c = get_cell_at(mesh, 1/6, 1/12, 0)
+    c = get_cell_at(mesh, 1 / 6, 1 / 12, 0)
 
     if c:
         A_e = assemble_local(a, c)
-        A_correct = numpy.array([[0, 1/12, 1/24, 0, 0, 0],
-                                 [0, 1/24, 1/12, 0, 0, 0],
-                                 [-1/12, 0, -1/24, 1/12, 0, 1/24],
-                                 [-1/24, 0, -1/12, 1/24, 0, 1/12],
-                                 [0, 0, 0, -1/12, -1/24, 0],
-                                 [0, 0, 0, -1/24, -1/12, 0]])
+        A_correct = numpy.array([[0, 1 / 12, 1 / 24, 0, 0, 0],
+                                 [0, 1 / 24, 1 / 12, 0, 0, 0],
+                                 [-1 / 12, 0, -1 / 24, 1 / 12, 0, 1 / 24],
+                                 [-1 / 24, 0, -1 / 12, 1 / 24, 0, 1 / 12],
+                                 [0, 0, 0, -1 / 12, -1 / 24, 0],
+                                 [0, 0, 0, -1 / 24, -1 / 12, 0]])
         error = ((A_e - A_correct)**2).sum()**0.5
         error = float(error)  # MPI.max does strange things to numpy.float64
 
@@ -132,9 +133,9 @@ def get_cell_at(mesh, x, y, z, eps=1e-3):
 
     """
     found = None
-    for cell in cells(mesh):
-        mp = cell.midpoint()
-        if abs(mp.x() - x) + abs(mp.y() - y) + abs(mp.y() - y) < eps:
+    for cell in Cells(mesh):
+        mp = cell.midpoint().array()
+        if abs(mp[0] - x) + abs(mp[1] - y) + abs(mp[2] - z) < eps:
             found = cell
             break
 

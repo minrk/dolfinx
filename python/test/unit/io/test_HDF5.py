@@ -4,40 +4,49 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import pytest
 import os
-from dolfin import *
-from dolfin_utils.test import (skip_if_not_HDF5, fixture, tempdir,
-                               xfail_with_serial_hdf5_in_parallel)
+
+import dolfin
+from dolfin import (MPI, Cell, Expression, Function, FunctionSpace,
+                    MeshEntities, MeshEntity, MeshFunction, has_hdf5,
+                    MeshValueCollection, UnitCubeMesh, UnitSquareMesh, cpp)
 from dolfin.la import PETScVector
-import dolfin.io as io
+from dolfin_utils.test import (skip_if_not_HDF5, tempdir, xfail_if_complex,
+                               xfail_with_serial_hdf5_in_parallel)
+if has_hdf5:
+    from dolfin.io import HDF5File
+
+assert(tempdir)
 
 
 @skip_if_not_HDF5
 @xfail_with_serial_hdf5_in_parallel
 def test_parallel(tempdir):
     filename = os.path.join(tempdir, "y.h5")
-    have_parallel = has_hdf5_parallel()
     hdf5 = HDF5File(MPI.comm_world, filename, "w")
+    assert(hdf5)
 
 
+@xfail_if_complex
 @skip_if_not_HDF5
 @xfail_with_serial_hdf5_in_parallel
 def test_save_vector(tempdir):
     filename = os.path.join(tempdir, "x.h5")
-    x = PETScVector(MPI.comm_world, 305)
+    x = PETScVector(MPI.comm_world, [0, 305], [], 1)
     x[:] = 1.0
     with HDF5File(MPI.comm_world, filename, "w") as vector_file:
         vector_file.write(x, "/my_vector")
 
 
+@xfail_if_complex
 @skip_if_not_HDF5
 @xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_vector(tempdir):
     filename = os.path.join(tempdir, "vector.h5")
 
     # Write to file
-    x = PETScVector(MPI.comm_world, 305)
+    local_range = MPI.local_range(MPI.comm_world, 305)
+    x = PETScVector(MPI.comm_world, local_range, [], 1)
     x[:] = 1.2
     with HDF5File(MPI.comm_world, filename, "w") as vector_file:
         vector_file.write(x, "/my_vector")
@@ -46,7 +55,8 @@ def test_save_and_read_vector(tempdir):
     with HDF5File(MPI.comm_world, filename, "r") as vector_file:
         y = vector_file.read_vector(MPI.comm_world, "/my_vector", False)
         assert y.size() == x.size()
-        assert (x - y).norm("l1") == 0.0
+        x.axpy(-1.0, y)
+        assert x.norm(dolfin.cpp.la.Norm.l2) == 0.0
 
 
 @skip_if_not_HDF5
@@ -72,8 +82,7 @@ def test_save_and_read_meshfunction_2D(tempdir):
     # Read back from file
     with HDF5File(mesh.mpi_comm(), filename, "r") as mf_file:
         for i in range(0, 3):
-            mf2 = MeshFunction('double', mesh, i, 0.0)
-            mf_file.read(mf2, "/meshfunction/meshfun%d" % i)
+            mf2 = mf_file.read_mf_double(mesh, "/meshfunction/meshfun%d" % i)
             for cell in MeshEntities(mesh, i):
                 assert meshfunctions[i][cell] == mf2[cell]
 
@@ -102,8 +111,7 @@ def test_save_and_read_meshfunction_3D(tempdir):
     # Read back from file
     mf_file = HDF5File(mesh.mpi_comm(), filename, "r")
     for i in range(0, 4):
-        mf2 = MeshFunction('double', mesh, i, 0.0)
-        mf_file.read(mf2, "/meshfunction/group/%d/meshfun" % i)
+        mf2 = mf_file.read_mf_double(mesh, "/meshfunction/group/%d/meshfun" % i)
         for cell in MeshEntities(mesh, i):
             assert meshfunctions[i][cell] == mf2[cell]
     mf_file.close()
@@ -116,7 +124,8 @@ def test_save_and_read_mesh_value_collection(tempdir):
     filename = os.path.join(tempdir, "mesh_value_collection.h5")
     mesh = UnitCubeMesh(MPI.comm_world, ndiv, ndiv, ndiv)
 
-    def point2list(p): return [p[0], p[1], p[2]]
+    def point2list(p):
+        return [p[0], p[1], p[2]]
 
     # write to file
     with HDF5File(mesh.mpi_comm(), filename, 'w') as f:
@@ -125,20 +134,19 @@ def test_save_and_read_mesh_value_collection(tempdir):
             mesh.init(dim)
             for e in MeshEntities(mesh, dim):
                 # this can be easily computed to the check the value
-                val = int(ndiv*sum(point2list(e.midpoint()))) + 1
+                val = int(ndiv * sum(point2list(e.midpoint()))) + 1
                 mvc.set_value(e.index(), val)
             f.write(mvc, "/mesh_value_collection_{}".format(dim))
 
     # read from file
     with HDF5File(mesh.mpi_comm(), filename, 'r') as f:
         for dim in range(mesh.topology.dim):
-            mvc = MeshValueCollection("size_t", mesh, dim)
-            f.read(mvc, "/mesh_value_collection_{}".format(dim))
+            mvc = f.read_mvc_size_t(mesh, "/mesh_value_collection_{}".format(dim))
             # check the values
             for (cell, lidx), val in mvc.values().items():
                 eidx = Cell(mesh, cell).entities(dim)[lidx]
                 mid = point2list(MeshEntity(mesh, dim, eidx).midpoint())
-                assert val == int(ndiv*sum(mid)) + 1
+                assert val == int(ndiv * sum(mid)) + 1
 
 
 @skip_if_not_HDF5
@@ -158,13 +166,13 @@ def test_save_and_read_mesh_value_collection_with_only_one_marked_entity(tempdir
 
     # read from file
     with HDF5File(mesh.mpi_comm(), filename, 'r') as f:
-        mvc = MeshValueCollection("size_t", mesh, 3)
-        f.read(mvc, "/mesh_value_collection")
+        mvc = f.read_mvc_size_t(mesh, "/mesh_value_collection")
         assert MPI.sum(mesh.mpi_comm(), mvc.size()) == 1
         if MPI.rank(mesh.mpi_comm()) == 0:
             assert mvc.get_value(0, 0) == 1
 
 
+@xfail_if_complex
 @skip_if_not_HDF5
 @xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_function(tempdir):
@@ -186,8 +194,8 @@ def test_save_and_read_function(tempdir):
     # Read back from file
     hdf5_file = HDF5File(mesh.mpi_comm(), filename, "r")
     F1 = hdf5_file.read_function(Q, "/function")
-    result = F0.vector() - F1.vector()
-    assert len(result.get_local().nonzero()[0]) == 0
+    F0.vector().axpy(-1.0, F1.vector())
+    assert F0.vector().norm(dolfin.cpp.la.Norm.l2) < 1.0e-12
     hdf5_file.close()
 
 
@@ -204,7 +212,7 @@ def test_save_and_read_mesh_2D(tempdir):
 
     # Read from file
     mesh_file = HDF5File(mesh0.mpi_comm(), filename, "r")
-    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False)
+    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False, cpp.mesh.GhostMode.none)
     mesh_file.close()
 
     assert mesh0.num_entities_global(0) == mesh1.num_entities_global(0)
@@ -225,7 +233,7 @@ def test_save_and_read_mesh_3D(tempdir):
 
     # Read from file
     mesh_file = HDF5File(mesh0.mpi_comm(), filename, "r")
-    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False)
+    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False, cpp.mesh.GhostMode.none)
     mesh_file.close()
 
     assert mesh0.num_entities_global(0) == mesh1.num_entities_global(0)

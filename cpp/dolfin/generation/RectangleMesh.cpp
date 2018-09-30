@@ -15,9 +15,28 @@ using namespace dolfin;
 using namespace dolfin::generation;
 
 //-----------------------------------------------------------------------------
+mesh::Mesh RectangleMesh::create(MPI_Comm comm,
+                                 const std::array<EigenPointVector, 2>& p,
+                                 std::array<std::size_t, 2> n,
+                                 mesh::CellType::Type cell_type,
+                                 const mesh::GhostMode ghost_mode,
+                                 std::string diagonal)
+{
+  if (cell_type == mesh::CellType::Type::triangle)
+    return build_tri(comm, p, n, ghost_mode, diagonal);
+  else if (cell_type == mesh::CellType::Type::quadrilateral)
+    return build_quad(comm, p, n, ghost_mode);
+  else
+    throw std::runtime_error("Generate rectangle mesh. Wrong cell type");
+
+  // Will never reach this point
+  return build_quad(comm, p, n, ghost_mode);
+}
+//-----------------------------------------------------------------------------
 mesh::Mesh RectangleMesh::build_tri(MPI_Comm comm,
                                     const std::array<EigenPointVector, 2>& p,
                                     std::array<std::size_t, 2> n,
+                                    const mesh::GhostMode ghost_mode,
                                     std::string diagonal)
 {
   // Receive mesh if not rank 0
@@ -26,17 +45,14 @@ mesh::Mesh RectangleMesh::build_tri(MPI_Comm comm,
     EigenRowArrayXXd geom(0, 2);
     EigenRowArrayXXi64 topo(0, 3);
     return mesh::MeshPartitioning::build_distributed_mesh(
-        comm, mesh::CellType::Type::triangle, geom, topo, {}, "none");
+        comm, mesh::CellType::Type::triangle, geom, topo, {}, ghost_mode);
   }
 
   // Check options
   if (diagonal != "left" && diagonal != "right" && diagonal != "right/left"
       && diagonal != "left/right" && diagonal != "crossed")
   {
-    log::dolfin_error("RectangleMesh.cpp", "create rectangle",
-                      "Unknown mesh diagonal definition: allowed options are "
-                      "\"left\", \"right\", \"left/right\", \"right/left\" and "
-                      "\"crossed\"");
+    std::runtime_error("Unknown mesh diagonal definition.");
   }
 
   const EigenPointVector& p0 = p[0];
@@ -60,18 +76,15 @@ mesh::Mesh RectangleMesh::build_tri(MPI_Comm comm,
 
   if (std::abs(x0 - x1) < DOLFIN_EPS || std::abs(y0 - y1) < DOLFIN_EPS)
   {
-    log::dolfin_error("Rectangle.cpp", "create rectangle",
-                      "Rectangle seems to have zero width, height or depth. "
-                      "Consider checking your dimensions");
+    throw std::runtime_error("Rectangle seems to have zero width, height or "
+                             "depth. Check dimensions");
   }
 
   if (nx < 1 || ny < 1)
   {
-    log::dolfin_error(
-        "RectangleMesh.cpp", "create rectangle",
-        "Rectangle has non-positive number of vertices in some "
-        "dimension: number of vertices must be at least 1 in each "
-        "dimension");
+    throw std::runtime_error(
+        "Rectangle has non-positive number of vertices in some dimension: "
+        "number of vertices must be at least 1 in each dimension");
   }
 
   // Create vertices and cells
@@ -197,12 +210,13 @@ mesh::Mesh RectangleMesh::build_tri(MPI_Comm comm,
   }
 
   return mesh::MeshPartitioning::build_distributed_mesh(
-      comm, mesh::CellType::Type::triangle, geom, topo, {}, "none");
+      comm, mesh::CellType::Type::triangle, geom, topo, {}, ghost_mode);
 }
 //-----------------------------------------------------------------------------
 mesh::Mesh RectangleMesh::build_quad(MPI_Comm comm,
                                      const std::array<EigenPointVector, 2>& p,
-                                     std::array<std::size_t, 2> n)
+                                     std::array<std::size_t, 2> n,
+                                     const mesh::GhostMode ghost_mode)
 {
   // Receive mesh if not rank 0
   if (dolfin::MPI::rank(comm) != 0)
@@ -210,7 +224,7 @@ mesh::Mesh RectangleMesh::build_quad(MPI_Comm comm,
     EigenRowArrayXXd geom(0, 2);
     EigenRowArrayXXi64 topo(0, 4);
     return mesh::MeshPartitioning::build_distributed_mesh(
-        comm, mesh::CellType::Type::quadrilateral, geom, topo, {}, "none");
+        comm, mesh::CellType::Type::quadrilateral, geom, topo, {}, ghost_mode);
   }
 
   const std::size_t nx = n[0];
@@ -254,6 +268,6 @@ mesh::Mesh RectangleMesh::build_quad(MPI_Comm comm,
     }
 
   return mesh::MeshPartitioning::build_distributed_mesh(
-      comm, mesh::CellType::Type::quadrilateral, geom, topo, {}, "none");
+      comm, mesh::CellType::Type::quadrilateral, geom, topo, {}, ghost_mode);
 }
 //-----------------------------------------------------------------------------

@@ -13,11 +13,12 @@ namespace dolfin
 {
 namespace la
 {
+class PETScMatrix;
 class PETScVector;
 
 /// This class defines a basis for vector spaces, typically used for
-/// expressing nullspaces of singular operators and 'near
-/// nullspaces' used in smoothed aggregation algebraic multigrid.
+/// expressing nullspaces of singular operators and 'near nullspaces'
+/// used in smoothed aggregation algebraic multigrid.
 
 class VectorSpaceBasis
 {
@@ -34,9 +35,9 @@ public:
   /// Destructor
   ~VectorSpaceBasis() = default;
 
-  /// Apply the Gram-Schmidt process to orthonormalize the
-  /// basis. Throws an error if a (near) linear dependency is
-  /// detected. Error is thrown if <x_i, x_i> < tol.
+  /// Apply the Gram-Schmidt process to orthonormalize the basis. Throws
+  /// an error if a (near) linear dependency is detected. Error is
+  /// thrown if <x_i, x_i> < tol.
   void orthonormalize(double tol = 1.0e-10);
 
   /// Test if basis is orthonormal
@@ -44,6 +45,9 @@ public:
 
   /// Test if basis is orthogonal
   bool is_orthogonal(double tol = 1.0e-10) const;
+
+  /// Test if basis is in null space of A
+  bool in_nullspace(const PETScMatrix& A, double tol = 1.0e-10) const;
 
   /// Orthogonalize x with respect to basis
   void orthogonalize(PETScVector& x) const;
@@ -55,8 +59,7 @@ public:
   std::shared_ptr<const PETScVector> operator[](std::size_t i) const;
 
 private:
-  // Basis vectors
   const std::vector<std::shared_ptr<PETScVector>> _basis;
 };
-}
-}
+} // namespace la
+} // namespace dolfin

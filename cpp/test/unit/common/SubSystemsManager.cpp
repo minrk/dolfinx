@@ -22,19 +22,20 @@
 
 #include <dolfin.h>
 #include <catch.hpp>
+#include <petscvec.h>
 
 namespace
 {
   void init_petsc()
   {
     // Test user initialisation of PETSc
-#ifdef HAS_PETSC
     int argc = 0;
     char **argv = NULL;
     PetscInitialize(&argc, &argv, NULL, NULL);
 
-    dolfin::la::PETScVector(MPI_COMM_WORLD);
-#endif
+    Vec x;
+    VecCreate(MPI_COMM_WORLD, &x);
+    VecDestroy(&x);
   }
 }
 

@@ -1,195 +1,282 @@
-"""Unit tests for assembly"""
-
 # Copyright (C) 2018 Garth N. Wells
 #
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+"""Unit tests for assembly"""
 
-import pytest
-import os
+import math
+
 import numpy
+import pytest
+from petsc4py import PETSc
+
 import dolfin
 import ufl
-from ufl import dx
+from ufl import dx, inner
 
 
-def xtest_initialisation():
-    "Test intialisation of the assembler"
-    mesh = dolfin.generation.UnitCubeMesh(dolfin.MPI.comm_world, 4, 4, 4)
-    V = dolfin.function.functionspace.FunctionSpace(mesh, "Lagrange", 1)
-    v = dolfin.function.argument.TestFunction(V)
-    u = dolfin.function.argument.TrialFunction(V)
-    f = dolfin.function.constant.Constant(0.0)
-    a = v * u * dx
-    L = v * f * dx
+def test_assemble_functional():
+    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 12, 12)
 
-    assembler = dolfin.fem.assembling.Assembler(a, L)
-    assembler = dolfin.fem.assembling.Assembler([[a, a], [a, a]], [L, L])
+    M = dolfin.Constant(1.0) * dx(domain=mesh)
+    value = dolfin.fem.assemble(M)
+    assert value == pytest.approx(1.0, 1e-12)
 
-    # TODO: test that exceptions are raised for incorrect input
-    # arguments
+    f = dolfin.function.expression.Expression("x[0]", degree=1)
+    M = f * dx(domain=mesh)
+    value = dolfin.fem.assemble(M)
+    assert value == pytest.approx(0.5, 1e-12)
 
 
-def xtest_matrix_assembly():
-    "Test basic assembly without Dirichlet boundary conditions"
-    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 8, 8)
-    V = dolfin.function.functionspace.FunctionSpace(mesh, "Lagrange", 1)
-    v = dolfin.function.argument.TestFunction(V)
-    u = dolfin.function.argument.TrialFunction(V)
-    f = dolfin.function.constant.Constant(1.0)
-    a = v * u * dx
-    L = v * f * dx
+def test_basic_assembly():
+    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 12, 12)
+    V = dolfin.FunctionSpace(mesh, "Lagrange", 1)
+    u, v = dolfin.TrialFunction(V), dolfin.TestFunction(V)
 
-    assembler = dolfin.fem.assembling.Assembler(a, L)
-    A, b = assembler.assemble()
+    a = dolfin.Constant(1.0) * inner(u, v) * dx
+    L = inner(dolfin.Constant(1.0), v) * dx
 
-    # Old assembler for reference (requires petsc4py)
-    B = dolfin.cpp.la.PETScMatrix(mesh.mpi_comm())
-    c = dolfin.cpp.la.PETScVector(mesh.mpi_comm())
-    ass0 = dolfin.fem.assembling.SystemAssembler(a, L)
-    ass0.assemble(B, c)
+    # Initial assembly
+    A = dolfin.fem.assemble(a)
+    b = dolfin.fem.assemble(L)
+    assert isinstance(A, dolfin.cpp.la.PETScMatrix)
+    assert isinstance(b, dolfin.cpp.la.PETScVector)
 
-    assert pytest.approx(0.0, 1.0e-17) == (A.mat() - B.mat()).norm()
-    assert pytest.approx(0.0, 1.0e-17) == (b.vec() - c.vec()).norm()
-
-    # b.vec().view()
-    # c.vec().view()
-
-    # A.mat().view()
-    # B.mat().view()
-    # print(c.vec().getArray())
-
-
-def xtest_matrix_assembly_bc():
-    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 2, 1)
-    V = dolfin.function.functionspace.FunctionSpace(mesh, "Lagrange", 1)
-    v = dolfin.function.argument.TestFunction(V)
-    u = dolfin.function.argument.TrialFunction(V)
-    f = dolfin.function.constant.Constant(1.0)
-    a = v * u * dx
-    L = v * f * dx
-
-    # Define Dirichlet boundary (x = 0 or x = 1)
-    def boundary(x):
-        return numpy.logical_or(x[:, 0] < 1.0e-6, x[:, 0] > 1.0 - 1.0e-6)
-
-    u0 = dolfin.function.constant.Constant(2.0)
-    bc = dolfin.fem.dirichletbc.DirichletBC(V, u0, boundary)
-
-    assembler = dolfin.fem.assembling.Assembler(a, L, [bc])
-    A, b = assembler.assemble()
-
-    # Old assembler for reference (requires petsc4py)
-    B = dolfin.cpp.la.PETScMatrix(mesh.mpi_comm())
-    c = dolfin.cpp.la.PETScVector(mesh.mpi_comm())
-    ass0 = dolfin.fem.assembling.SystemAssembler(a, L, [bc])
-    ass0.assemble(B, c)
-
-    b.vec().view()
-    c.vec().view()
-    # A.mat().view()
-    # B.mat().view()
+    # Second assembly
+    A = dolfin.fem.assemble(A, a)
+    b = dolfin.fem.assemble(b, L)
+    assert isinstance(A, dolfin.cpp.la.PETScMatrix)
+    assert isinstance(b, dolfin.cpp.la.PETScVector)
 
 
 def test_matrix_assembly_block():
-    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 1, 1)
+    """Test assembly of block matrices and vectors into (a) monolithic
+    blocked structures, PETSc Nest structures, and monolithic structures.
+    """
 
-    V0 = dolfin.function.functionspace.FunctionSpace(mesh, "Lagrange", 1)
-    V1 = dolfin.function.functionspace.FunctionSpace(mesh, "Lagrange", 1)
+    # mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 4, 8)
+    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 2, 1)
+
+    p0, p1 = 1, 2
+    P0 = ufl.FiniteElement("Lagrange", mesh.ufl_cell(), p0)
+    P1 = ufl.FiniteElement("Lagrange", mesh.ufl_cell(), p1)
+
+    V0 = dolfin.function.functionspace.FunctionSpace(mesh, P0)
+    V1 = dolfin.function.functionspace.FunctionSpace(mesh, P1)
+
+    def boundary(x):
+        return numpy.logical_or(x[:, 0] < 1.0e-6, x[:, 0] > 1.0 - 1.0e-6)
+
+    u_bc = dolfin.function.constant.Constant(50.0)
+    bc = dolfin.fem.dirichletbc.DirichletBC(V1, u_bc, boundary)
 
     # Define variational problem
     u, p = dolfin.function.argument.TrialFunction(
         V0), dolfin.function.argument.TrialFunction(V1)
     v, q = dolfin.function.argument.TestFunction(
         V0), dolfin.function.argument.TestFunction(V1)
-    #(u, p) = dolfin.function.argument.TrialFunctions(W)
-    #(v, q) = dolfin.function.argument.TestFunctions(W)
-    f = dolfin.function.constant.Constant(0)
+    f = dolfin.function.constant.Constant(1.0)
+    g = dolfin.function.constant.Constant(-3.0)
+    zero = dolfin.function.constant.Constant(0.0)
 
-    a00 = u*v*dx
-    a01 = v*p * dx
-    a10 = q * u * dx
-    a11 = q * p * dx
-    #a11 = None
+    a00 = inner(u, v) * dx
+    a01 = inner(p, v) * dx
+    a10 = inner(u, q) * dx
+    a11 = inner(p, q) * dx
+    # a11 = None
 
-    L0 = f*v * dx
-    L1 = dolfin.function.constant.Constant(0.0)*q * dx
+    L0 = zero * inner(f, v) * dx
+    L1 = inner(g, q) * dx
 
-    # Define Dirichlet boundary (x = 0 or x = 1)
-    def boundary(x):
-        return numpy.logical_or(x[:, 0] < 1.0e-6,  x[:, 0] > 1.0 - 1.0e-6)
+    a_block = [[a00, a01], [a10, a11]]
+    L_block = [L0, L1]
 
-    u0 = dolfin.function.constant.Constant(2.0)
-    bc = dolfin.fem.dirichletbc.DirichletBC(V1, u0, boundary)
+    # Monolithic blocked
+    A0 = dolfin.fem.assemble_matrix(a_block, [bc],
+                                    dolfin.cpp.fem.BlockType.monolithic)
+    b0 = dolfin.fem.assemble_vector(L_block, a_block, [bc],
+                                    dolfin.cpp.fem.BlockType.monolithic)
+    assert A0.mat().getType() != "nest"
+    Anorm0 = A0.mat().norm()
+    bnorm0 = b0.vec().norm()
 
-    assembler = dolfin.fem.assembling.Assembler([[a00, a01], [a10, a11]],
-                                                [L0, L1], [bc])
-    A, b = assembler.assemble()
+    # Nested (MatNest)
+    A1 = dolfin.fem.assemble_matrix(a_block, [bc],
+                                    dolfin.cpp.fem.BlockType.nested)
+    b1 = dolfin.fem.assemble_vector(L_block, a_block, [bc],
+                                    dolfin.cpp.fem.BlockType.nested)
+    bnorm1 = math.sqrt(sum([x.norm()**2 for x in b1.vec().getNestSubVecs()]))
+    assert bnorm0 == pytest.approx(bnorm1, 1.0e-12)
 
-    A.mat().view()
+    try:
+        Anorm1 = 0.0
+        nrows, ncols = A1.mat().getNestSize()
+        for row in range(nrows):
+            for col in range(ncols):
+                A_sub = A1.mat().getNestSubMatrix(row, col)
+                norm = A_sub.norm()
+                Anorm1 += norm * norm
+                # A_sub.view()
 
-    #IS = A.mat().getNestISs()
-    # print(IS[0][0].view())
-    # print(IS[0][1].view())
-    # print(IS[0][1].view())
-    # print(IS[1][1].view())
-    # print(A.mat().norm())
+        # is_rows, is_cols = A1.mat().getNestLocalISs()
+        # for is0 in is_rows:
+        #     for is1 in is_cols:
+        #         A_sub = A1.mat().getLocalSubMatrix(is0, is1)
+        #         norm = A_sub.norm()
+        #         Anorm1 += norm * norm
 
-    #A00 = A.mat().getLocalSubMatrix(0, 0)
+        Anorm1 = math.sqrt(Anorm1)
+        assert Anorm0 == pytest.approx(Anorm1, 1.0e-12)
+
+    except AttributeError:
+        print("Recent petsc4py(-dev) required to get MatNest sub-matrix.")
+
+    # Monolithic version
+    E = P0 * P1
+    W = dolfin.function.functionspace.FunctionSpace(mesh, E)
+    u0, u1 = dolfin.function.argument.TrialFunctions(W)
+    v0, v1 = dolfin.function.argument.TestFunctions(W)
+    a = inner(u0, v0) * dx + inner(u1, v1) * dx + inner(u0, v1) * dx + inner(
+        u1, v0) * dx
+    L = zero * inner(f, v0) * ufl.dx + inner(g, v1) * dx
+
+    bc = dolfin.fem.dirichletbc.DirichletBC(W.sub(1), u_bc, boundary)
+    A2 = dolfin.fem.assemble_matrix([[a]], [bc],
+                                    dolfin.cpp.fem.BlockType.monolithic)
+    b2 = dolfin.fem.assemble_vector([L], [[a]], [bc],
+                                    dolfin.cpp.fem.BlockType.monolithic)
+    assert A2.mat().getType() != "nest"
+
+    Anorm2 = A2.mat().norm()
+    bnorm2 = b2.vec().norm()
+    assert Anorm0 == pytest.approx(Anorm2, 1.0e-9)
+    assert bnorm0 == pytest.approx(bnorm2, 1.0e-9)
 
 
-def xtest_matrix_assembly_block():
-    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 1, 1)
+def xtest_assembly_solve_block():
+    """Solve a two-field mass-matrix like problem with block matrix approaches
+    and test that solution is the same.
+    """
 
-    #P2 = ufl.VectorElement("Lagrange", mesh.ufl_cell(), 2)
-    #P1 = ufl.FiniteElement("Lagrange", mesh.ufl_cell(), 1)
-    #TH = P2 * P1
-    #W = dolfin.function.functionspace.FunctionSpace(mesh, TH)
+    mesh = dolfin.generation.UnitSquareMesh(dolfin.MPI.comm_world, 32, 31)
+    p0, p1 = 1, 1
+    P0 = ufl.FiniteElement("Lagrange", mesh.ufl_cell(), p0)
+    P1 = ufl.FiniteElement("Lagrange", mesh.ufl_cell(), p1)
+    V0 = dolfin.function.functionspace.FunctionSpace(mesh, P0)
+    V1 = dolfin.function.functionspace.FunctionSpace(mesh, P1)
 
-    P2 = dolfin.function.functionspace.VectorFunctionSpace(mesh, "Lagrange", 1)
-    P1 = dolfin.function.functionspace.FunctionSpace(mesh, "Lagrange", 1)
-
-    # Define variational problem
-    u, p = dolfin.function.argument.TrialFunction(
-        P2), dolfin.function.argument.TrialFunction(P1)
-    v, q = dolfin.function.argument.TestFunction(
-        P2), dolfin.function.argument.TestFunction(P1)
-    #(u, p) = dolfin.function.argument.TrialFunctions(W)
-    #(v, q) = dolfin.function.argument.TestFunctions(W)
-    f = dolfin.function.constant.Constant((0, 0))
-
-    #a = (ufl.inner(ufl.grad(u), ufl.grad(v)) - ufl.div(v)*p + q*ufl.div(u))*dx
-    #L = ufl.inner(f, v)*dx
-
-    a00 = ufl.inner(ufl.grad(u), ufl.grad(v)) * dx
-    a01 = -ufl.div(v) * p * dx
-    a10 = q * ufl.div(u) * dx
-    a11 = dolfin.function.constant.Constant(0.0) * q * p * dx
-    #a11 = None
-
-    L0 = ufl.inner(f, v) * dx
-    L1 = dolfin.function.constant.Constant(0.0)*q * dx
-    #L1 = None
-
-    # Define Dirichlet boundary (x = 0 or x = 1)
     def boundary(x):
         return numpy.logical_or(x[:, 0] < 1.0e-6, x[:, 0] > 1.0 - 1.0e-6)
 
-    u0 = dolfin.function.constant.Constant((2.0, 1.0))
-    bc = dolfin.fem.dirichletbc.DirichletBC(P2, u0, boundary)
+    u_bc0 = dolfin.function.constant.Constant(50.0)
+    u_bc1 = dolfin.function.constant.Constant(20.0)
+    bc0 = dolfin.fem.dirichletbc.DirichletBC(V0, u_bc0, boundary)
+    bc1 = dolfin.fem.dirichletbc.DirichletBC(V1, u_bc1, boundary)
 
-    assembler = dolfin.fem.assembling.Assembler([[a00, a01], [a10, a11]],
-                                                [L0, L1], [bc])
-    A, b = assembler.assemble()
+    # Variational problem
+    u, p = dolfin.function.argument.TrialFunction(
+        V0), dolfin.function.argument.TrialFunction(V1)
+    v, q = dolfin.function.argument.TestFunction(
+        V0), dolfin.function.argument.TestFunction(V1)
+    f = dolfin.function.constant.Constant(1.0)
+    g = dolfin.function.constant.Constant(-3.0)
+    zero = dolfin.function.constant.Constant(0.0)
 
-    A.mat().view()
+    a00 = inner(u, v) * dx
+    a01 = zero * inner(p, v) * dx
+    a10 = zero * inner(u, q) * dx
+    a11 = inner(p, q) * dx
+    L0 = inner(f, v) * dx
+    L1 = inner(g, q) * dx
 
-    IS = A.mat().getNestISs()
-    # print(IS[0][0].view())
-    # print(IS[0][1].view())
-    print(IS[0][1].view())
-    # print(IS[1][1].view())
-    # print(A.mat().norm())
+    def monitor(ksp, its, rnorm):
+        pass
+        # print("Norm:", its, rnorm)
 
-    #A00 = A.mat().getLocalSubMatrix(0, 0)
+    # Create assembler
+    assembler = dolfin.fem.Assembler([[a00, a01], [a10, a11]], [L0, L1],
+                                     [bc0, bc1])
+
+    # Monolithic blocked
+    A0, b0 = assembler.assemble(
+        mat_type=dolfin.cpp.fem.Assembler.BlockType.monolithic)
+    A0norm = A0.mat().norm()
+    b0norm = b0.vec().norm()
+    x0 = A0.mat().createVecLeft()
+    ksp = PETSc.KSP()
+    ksp.create(mesh.mpi_comm())
+    ksp.setOperators(A0.mat())
+    ksp.setTolerances(rtol=1.0e-12)
+    ksp.setMonitor(monitor)
+    ksp.setType('cg')
+    ksp.setFromOptions()
+    # ksp.view()
+    ksp.solve(b0.vec(), x0)
+    x0norm = x0.norm()
+
+    # Nested (MatNest)
+    A1, b1 = assembler.assemble(
+        mat_type=dolfin.cpp.fem.Assembler.BlockType.nested)
+    b1norm = b1.vec().norm()
+    assert b1norm == pytest.approx(b0norm, 1.0e-12)
+
+    x1 = dolfin.la.PETScVector(b1)
+    ksp = PETSc.KSP()
+    ksp.create(mesh.mpi_comm())
+    ksp.setMonitor(monitor)
+    ksp.setTolerances(rtol=1.0e-12)
+    ksp.setOperators(A1.mat())
+    ksp.setType('cg')
+    ksp.setFromOptions()
+    # ksp.view()
+    ksp.solve(b1.vec(), x1.vec())
+    x1norm = x1.vec().norm()
+    assert x1norm == pytest.approx(x0norm, rel=1.0e-10)
+
+    # Monolithic version
+    E = P0 * P1
+    W = dolfin.function.functionspace.FunctionSpace(mesh, E)
+    u0, u1 = dolfin.function.argument.TrialFunctions(W)
+    v0, v1 = dolfin.function.argument.TestFunctions(W)
+    a = inner(u0, v0) * dx + inner(u1, v1) * dx
+    L = inner(f, v0) * ufl.dx + inner(g, v1) * dx
+
+    u_bc = dolfin.function.constant.Constant((50.0, 20.0))
+    bc = dolfin.fem.dirichletbc.DirichletBC(W, u_bc, boundary)
+    assembler = dolfin.fem.assembler.Assembler([[a]], [L], [bc])
+
+    A2, b2 = assembler.assemble(
+        mat_type=dolfin.cpp.fem.Assembler.BlockType.monolithic)
+    A2norm = A2.mat().norm()
+    b2norm = b2.vec().norm()
+    assert A2norm == pytest.approx(A0norm, 1.0e-12)
+    assert b2norm == pytest.approx(b0norm, 1.0e-12)
+
+    x2 = dolfin.cpp.la.PETScVector(b2)
+    ksp = PETSc.KSP()
+    ksp.create(mesh.mpi_comm())
+    ksp.setMonitor(monitor)
+    ksp.setOperators(A2.mat())
+    ksp.setType('cg')
+    ksp.setTolerances(rtol=1.0e-9)
+    ksp.setFromOptions()
+    # ksp.view()
+    ksp.solve(b2.vec(), x2.vec())
+    x2norm = x2.vec().norm()
+    assert x2norm == pytest.approx(x0norm, 1.0e-10)
+
+    # Old assembler (reference)
+    A3, b3 = dolfin.fem.assembling.assemble_system(a, L, [bc])
+    x3 = dolfin.cpp.la.PETScVector(b3)
+    ksp = PETSc.KSP()
+    ksp.create(mesh.mpi_comm())
+    ksp.setMonitor(monitor)
+    ksp.setOperators(A3.mat())
+    ksp.setType('cg')
+    ksp.setTolerances(rtol=1.0e-9)
+    ksp.setFromOptions()
+    # ksp.view()
+    ksp.solve(b3.vec(), x3.vec())
+    x3norm = x3.vec().norm()
+    assert x3norm == pytest.approx(x0norm, 1.0e-10)

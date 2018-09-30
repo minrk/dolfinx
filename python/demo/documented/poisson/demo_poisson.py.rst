@@ -79,6 +79,7 @@ First, the :py:mod:`dolfin` module is imported: ::
     import numpy as np
     import dolfin
     from dolfin import *
+    from dolfin.io import XDMFFile
 
 We begin by defining a mesh of the domain and a finite element
 function space :math:`V` relative to this mesh. As the unit square is
@@ -88,7 +89,9 @@ to create a mesh consisting of 32 x 32 squares with each square
 divided into two triangles, we do as follows ::
 
     # Create mesh and define function space
-    mesh = RectangleMesh.create(MPI.comm_world, [Point(0,0), Point(1,1)], [32, 32], CellType.Type.triangle)
+    mesh = RectangleMesh.create(MPI.comm_world,
+        [Point(0,0)._cpp_object, Point(1,1)._cpp_object], [32, 32],
+        CellType.Type.triangle, dolfin.cpp.mesh.GhostMode.none)
     V = FunctionSpace(mesh, "Lagrange", 1)
 
     cmap = dolfin.fem.create_coordinate_map(mesh.ufl_domain())
@@ -158,7 +161,7 @@ the linear form ``L`` (using UFL operators). In summary, this reads ::
     f = Expression("10*exp(-(pow(x[0] - 0.5, 2) + pow(x[1] - 0.5, 2)) / 0.02)", degree=2)
     g = Expression("sin(5*x[0])", degree=2)
     a = inner(grad(u), grad(v))*dx
-    L = f*v*dx + g*v*ds
+    L = inner(f, v)*dx + inner(g, v)*ds
 
 Now, we have specified the variational forms and can consider the
 solution of the variational problem. First, we need to define a
@@ -172,7 +175,7 @@ a finite element function space. Next, we can call the :py:func:`solve
 
     # Compute solution
     u = Function(V)
-    solve(a == L, u, bc)
+    solve(a == L, u, bc, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
 
 The function ``u`` will be modified during the call to solve. The
 default settings for solving a variational problem have been
@@ -186,8 +189,9 @@ for later visualization and also plot it using
 the :py:func:`plot <dolfin.common.plot.plot>` command: ::
 
     # Save solution in XDMF format
-    file = XDMFFile(MPI.comm_world, "poisson.xdmf")
-    file.write(u, XDMFFile.Encoding.HDF5)
+    with XDMFFile(MPI.comm_world, "poisson.xdmf",
+                  encoding=XDMFFile.Encoding.HDF5) as file:
+        file.write(u)
 
     # Plot solution
     import matplotlib.pyplot as plt

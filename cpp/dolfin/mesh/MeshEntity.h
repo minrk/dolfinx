@@ -124,7 +124,10 @@ public:
   /// dimension.
   inline std::size_t num_entities(std::size_t dim) const
   {
-    return _mesh->topology().connectivity(_dim, dim).size(_local_index);
+    if (dim == _dim)
+      return 1;
+    else
+      return _mesh->topology().connectivity(_dim, dim).size(_local_index);
   }
 
   /// Return global number of incident mesh entities of given
@@ -138,7 +141,10 @@ public:
   ///         dimension.
   std::size_t num_global_entities(std::size_t dim) const
   {
-    return _mesh->topology().connectivity(_dim, dim).size_global(_local_index);
+    if (dim == _dim)
+      return 1;
+    else
+      return _mesh->topology().connectivity(_dim, dim).size_global(_local_index);
   }
 
   /// Return array of indices for incident mesh entities of given
@@ -151,10 +157,15 @@ public:
   ///         The index for incident mesh entities of given dimension.
   const std::int32_t* entities(std::size_t dim) const
   {
-    const std::int32_t* initialized_mesh_entities
+    if (dim == _dim)
+      return &_local_index;
+    else
+    {
+      const std::int32_t* initialized_mesh_entities
         = _mesh->topology().connectivity(_dim, dim)(_local_index);
-    assert(initialized_mesh_entities);
-    return initialized_mesh_entities;
+      assert(initialized_mesh_entities);
+      return initialized_mesh_entities;
+    }
   }
 
   /// Check if given entity is incident
@@ -235,7 +246,6 @@ public:
   std::string str(bool verbose) const;
 
 protected:
-  // Friends
   template <typename T>
   friend class MeshRange;
   template <typename T>

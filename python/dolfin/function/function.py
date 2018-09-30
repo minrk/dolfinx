@@ -4,27 +4,26 @@
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-
-"""This module handles the Function class in Python.
-
-"""
+"""Finite element functions"""
 
 import numpy as np
+
 import ufl
-from ufl.classes import ComponentTensor, Sum, Product, Division
-from ufl.utils.indexflattening import shape_to_strides, flatten_multiindex
-import dolfin.cpp as cpp
-import dolfin.la as la
-from dolfin.function.functionspace import FunctionSpace
-from dolfin.function.expression import Expression
-from dolfin.function.constant import Constant
+from dolfin import common, cpp, function, la
+from ufl.classes import ComponentTensor, Division, Product, Sum
+from ufl.utils.indexflattening import flatten_multiindex, shape_to_strides
 
 
 def _assign_error():
-    raise RuntimeError("Expected only linear combinations of Functions in the same FunctionSpaces")
+    raise RuntimeError(
+        "Expected only linear combinations of Functions in the same FunctionSpaces"
+    )
 
 
-def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None):
+def _check_mul_and_division(e,
+                            linear_comb,
+                            scalar_weight=1.0,
+                            multi_index=None):
     """
     Utility func for checking division and multiplication of a Function
     with scalars in linear combinations of Functions
@@ -46,7 +45,7 @@ def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None)
     if isinstance(e, Product):
         for i, op in enumerate(e.ufl_operands):
             if isinstance(op, ScalarValue) or \
-               (isinstance(op, Constant) and op.value_size() == 1):
+               (isinstance(op, function.Constant) and op.value_size() == 1):
                 scalar = op
                 expr = e.ufl_operands[1 - i]
                 break
@@ -56,8 +55,8 @@ def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None)
         scalar_weight *= float(scalar)
     elif isinstance(e, Division):
         expr, scalar = e.ufl_operands
-        if not (isinstance(scalar, ScalarValue) or
-                isinstance(scalar, Constant) and scalar.value_rank() == 1):
+        if not (isinstance(scalar, ScalarValue) or isinstance(
+                scalar, function.Constant) and scalar.value_rank() == 1):
             _assign_error()
         scalar_weight /= float(scalar)
     else:
@@ -87,9 +86,11 @@ def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None)
             #    _error()
 
         if isinstance(expr, (Product, Division)):
-            linear_comb = _check_mul_and_division(expr, linear_comb, scalar_weight, multi_index)
+            linear_comb = _check_mul_and_division(expr, linear_comb,
+                                                  scalar_weight, multi_index)
         elif isinstance(expr, Sum):
-            linear_comb = _check_and_extract_functions(expr, linear_comb, scalar_weight, multi_index)
+            linear_comb = _check_and_extract_functions(
+                expr, linear_comb, scalar_weight, multi_index)
         else:
             _assign_error()
     else:
@@ -98,7 +99,9 @@ def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None)
     return linear_comb
 
 
-def _check_and_extract_functions(e, linear_comb=None, scalar_weight=1.0,
+def _check_and_extract_functions(e,
+                                 linear_comb=None,
+                                 scalar_weight=1.0,
                                  multi_index=None):
     """
     Utility func for extracting Functions and scalars in linear
@@ -108,27 +111,29 @@ def _check_and_extract_functions(e, linear_comb=None, scalar_weight=1.0,
     linear_comb = linear_comb or []
 
     # First check u
-    if isinstance(e, Function):
+    if isinstance(e, function.Function):
         linear_comb.append((e, scalar_weight))
         return linear_comb
 
     # Second check a*u*b, u/a/b, a*u/b where a and b are scalars
     elif isinstance(e, (Product, Division)):
-        linear_comb = _check_mul_and_division(e, linear_comb, scalar_weight, multi_index)
+        linear_comb = _check_mul_and_division(e, linear_comb, scalar_weight,
+                                              multi_index)
         return linear_comb
 
     # Third check a*u*b, u/a/b, a*u/b where a and b are scalars and u
     # is a Tensor
     elif isinstance(e, ComponentTensor):
         e, multi_index = e.ufl_operands
-        linear_comb = _check_mul_and_division(e, linear_comb, scalar_weight, multi_index)
+        linear_comb = _check_mul_and_division(e, linear_comb, scalar_weight,
+                                              multi_index)
         return linear_comb
 
     # If not Product or Division we expect Sum
     elif isinstance(e, Sum):
         for op in e.ufl_operands:
-            linear_comb = _check_and_extract_functions(op, linear_comb,
-                                                       scalar_weight, multi_index)
+            linear_comb = _check_and_extract_functions(
+                op, linear_comb, scalar_weight, multi_index)
 
     else:
         _assign_error()
@@ -168,19 +173,19 @@ def _check_and_contract_linear_comb(expr, self, multi_index):
 
 
 class Function(ufl.Coefficient):
-
     def __init__(self, *args, **kwargs):
         """Initialize Function."""
 
-        if isinstance(args[0], Function):
+        if isinstance(args[0], function.Function):
             other = args[0]
             if len(args) == 1:
                 # Copy constructor used to be here
-                raise RuntimeError("Use 'Function.copy(deepcopy=True)' for copying.")
+                raise RuntimeError(
+                    "Use 'Function.copy(deepcopy=True)' for copying.")
             elif len(args) == 2:
                 i = args[1]
                 if not isinstance(i, int):
-                    raise TypeError("Invalid subfunction number %s" % (i,))
+                    raise TypeError("Invalid subfunction number %s" % (i, ))
                 num_sub_spaces = other.function_space().num_sub_spaces()
                 if num_sub_spaces == 1:
                     raise RuntimeError("No subfunctions to extract")
@@ -188,16 +193,20 @@ class Function(ufl.Coefficient):
                     raise RuntimeError("Can only extract subfunctions "
                                        "with i = 0..%d" % num_sub_spaces)
                 self._cpp_object = other._cpp_object.sub(i)
-                ufl.Coefficient.__init__(self, self.function_space().ufl_function_space(),
-                                         count=self._cpp_object.id())
+                ufl.Coefficient.__init__(
+                    self,
+                    self.function_space().ufl_function_space(),
+                    count=self._cpp_object.id())
             else:
                 raise TypeError("expected one or two arguments when "
                                 "instantiating from another Function")
         elif isinstance(args[0], cpp.function.Function):
             self._cpp_object = args[0]
-            ufl.Coefficient.__init__(self, self.function_space().ufl_function_space(),
-                                     count=self._cpp_object.id())
-        elif isinstance(args[0], FunctionSpace):
+            ufl.Coefficient.__init__(
+                self,
+                self.function_space().ufl_function_space(),
+                count=self._cpp_object.id())
+        elif isinstance(args[0], function.FunctionSpace):
             V = args[0]
 
             # If initialising from a FunctionSpace
@@ -206,30 +215,35 @@ class Function(ufl.Coefficient):
                 self._cpp_object = cpp.function.Function(V._cpp_object)
             elif len(args) == 2:
                 if isinstance(args[1], cpp.la.PETScVector):
-                    self._cpp_object = cpp.function.Function(V._cpp_object, args[1])
+                    self._cpp_object = cpp.function.Function(
+                        V._cpp_object, args[1])
                 elif isinstance(args[1], cpp.function.Function):
                     self._cpp_object = args[1]
                 elif isinstance(args[1], str):
                     # Read from xml filename in string
-                    self._cpp_object = cpp.function.Function(V._cpp_object, args[1])
+                    self._cpp_object = cpp.function.Function(
+                        V._cpp_object, args[1])
                 else:
-                    raise RuntimeError("Don't know what to do with ", type(args[1]))
+                    raise RuntimeError("Don't know what to do with ",
+                                       type(args[1]))
             else:
                 raise RuntimeError("Don't know what to do yet")
 
             # Initialize the ufl.FunctionSpace
-            ufl.Coefficient.__init__(self, V.ufl_function_space(), count=self._cpp_object.id())
+            ufl.Coefficient.__init__(
+                self, V.ufl_function_space(), count=self._cpp_object.id())
 
         else:
-            raise TypeError("Expected a FunctionSpace or a Function as argument 1")
+            raise TypeError(
+                "Expected a FunctionSpace or a Function as argument 1")
 
         # Set name as given or automatic
         name = kwargs.get("name") or "f_%d" % self.count()
-        self.rename(name, "a Function")
+        self.rename(name)
 
     def function_space(self):
         "Return the FunctionSpace"
-        return FunctionSpace(self._cpp_object.function_space())
+        return function.FunctionSpace(self._cpp_object.function_space())
 
     def value_rank(self):
         return self._cpp_object.value_rank()
@@ -244,7 +258,7 @@ class Function(ufl.Coefficient):
         """Function used by ufl to evaluate the Expression"""
         # FIXME: same as dolfin.expression.Expression version. Find
         # way to re-use.
-        assert derivatives == ()   # TODO: Handle derivatives
+        assert derivatives == ()  # TODO: Handle derivatives
 
         if component:
             shape = self.ufl_shape
@@ -264,8 +278,16 @@ class Function(ufl.Coefficient):
         # Assume all args are x argument
         x = np.array(args)
 
+        dim = self.ufl_domain().geometric_dimension()
+        if x.shape[-1] != dim:
+            raise TypeError("expected the geometry argument to be of "
+                            "length %d" % dim)
+
         value_size = ufl.product(self.ufl_element().value_shape())
-        values = np.empty((1, value_size))
+        if common.has_petsc_complex:
+            values = np.empty((1, value_size), dtype=np.complex128)
+        else:
+            values = np.empty((1, value_size))
 
         # The actual evaluation
         self._cpp_object.eval(values, x)
@@ -277,10 +299,6 @@ class Function(ufl.Coefficient):
         print("Returning values: ", values)
 
         return values
-
-    # def _assign(self, u):
-    #    if isinstance(u, cpp.function.FunctionAXPY):
-    #        self._cpp_object._assign(u)
 
     def eval_cell(self, u, x, cell):
         return self._cpp_object.eval(u, x, cell)
@@ -300,11 +318,11 @@ class Function(ufl.Coefficient):
         else:
             self._cpp_object.interpolate(u)
 
-    def compute_vertex_values(self, mesh=None):
+    def compute_point_values(self, mesh=None):
         if mesh is not None:
-            return self._cpp_object.compute_vertex_values(mesh)
+            return self._cpp_object.compute_point_values(mesh)
         else:
-            return self._cpp_object.compute_vertex_values()
+            return self._cpp_object.compute_point_values()
 
     def set_allow_extrapolation(self, value):
         self._cpp_object.set_allow_extrapolation(value)
@@ -315,8 +333,10 @@ class Function(ufl.Coefficient):
     def copy(self, deepcopy=False):
         # See https://bitbucket.org/fenics-project/dolfin/issues/702
         if deepcopy:
-            return Function(self.function_space(), self._cpp_object.vector().copy())
-        return Function(self.function_space(), self._cpp_object.vector())
+            return function.Function(self.function_space(),
+                                     self._cpp_object.vector().copy())
+        return function.Function(self.function_space(),
+                                 self._cpp_object.vector())
 
     def vector(self):
         return self._cpp_object.vector()
@@ -332,12 +352,12 @@ class Function(ufl.Coefficient):
                 FunctionSpaces.
         """
 
-        if isinstance(rhs, (cpp.function.Function, cpp.function.Expression, cpp.function.FunctionAXPY)):
+        if isinstance(rhs, (cpp.function.Function, cpp.function.Expression)):
             # Avoid self assignment
             if self == rhs:
                 return
             self._cpp_object._assign(rhs)
-        elif isinstance(rhs, (Constant, Function, Expression)):
+        elif isinstance(rhs, (function.Constant, function.Function, function.Expression)):
             # Avoid self assignment
             if self == rhs:
                 return
@@ -347,8 +367,9 @@ class Function(ufl.Coefficient):
                 rhs, multi_index = rhs.ufl_operands
             else:
                 multi_index = None
-            linear_comb = _check_and_contract_linear_comb(rhs, self, multi_index)
-            assert(linear_comb)
+            linear_comb = _check_and_contract_linear_comb(
+                rhs, self, multi_index)
+            assert (linear_comb)
 
             # If the assigned Function lives in a different FunctionSpace
             # we cannot operate on this function directly
@@ -374,7 +395,9 @@ class Function(ufl.Coefficient):
                 vector.axpy(weight, func.vector())
 
         else:
-            raise RuntimeError("Expected a Function or linear combinations of Functions in the same FunctionSpace")
+            raise RuntimeError(
+                "Expected a Function or linear combinations of Functions in the same FunctionSpace"
+            )
 
     def __float__(self):
         # FIXME: this could be made simple on the C++ (in particular,
@@ -383,7 +406,8 @@ class Function(ufl.Coefficient):
             raise RuntimeError("Cannot convert nonscalar function to float.")
         elm = self.ufl_element()
         if elm.family() != "Real":
-            raise RuntimeError("Cannot convert spatially varying function to float.")
+            raise RuntimeError(
+                "Cannot convert spatially varying function to float.")
         # FIXME: This could be much simpler be exploiting that the
         # vector is ghosted
         # Gather value directly from vector in a parallel safe way
@@ -395,8 +419,8 @@ class Function(ufl.Coefficient):
     def name(self):
         return self._cpp_object.name()
 
-    def rename(self, name, s):
-        self._cpp_object.rename(name, s)
+    def rename(self, name):
+        self._cpp_object.rename(name)
 
     def id(self):
         return self._cpp_object.id()
@@ -407,11 +431,13 @@ class Function(ufl.Coefficient):
 
     def root_node(self):
         u = self._cpp_object.root_node()
-        return Function(FunctionSpace(u.function_space()), u.vector())
+        return function.Function(
+            function.FunctionSpace(u.function_space()), u.vector())
 
     def leaf_node(self):
         u = self._cpp_object.leaf_node()
-        return Function(FunctionSpace(u.function_space()), u.vector())
+        return function.Function(
+            function.FunctionSpace(u.function_space()), u.vector())
 
     def cpp_object(self):
         return self._cpp_object
@@ -434,14 +460,15 @@ class Function(ufl.Coefficient):
         if num_sub_spaces == 1:
             raise RuntimeError("No subfunctions to extract")
         if not i < num_sub_spaces:
-            raise RuntimeError("Can only extract subfunctions with i = 0..%d"
-                               % num_sub_spaces)
+            raise RuntimeError("Can only extract subfunctions with i = 0..%d" %
+                               num_sub_spaces)
 
         # Create and instantiate the Function
         if deepcopy:
-            return Function(self.function_space().sub(i),
-                            self.cpp_object().sub(i),
-                            name='%s-%d' % (str(self), i))
+            return function.Function(
+                self.function_space().sub(i),
+                self.cpp_object().sub(i),
+                name='%s-%d' % (str(self), i))
         else:
             return Function(self, i, name='%s-%d' % (str(self), i))
 

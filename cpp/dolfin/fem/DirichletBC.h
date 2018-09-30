@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 
 namespace dolfin
 {
@@ -21,7 +22,7 @@ namespace function
 {
 class GenericFunction;
 class FunctionSpace;
-}
+} // namespace function
 
 namespace mesh
 {
@@ -29,7 +30,7 @@ class Facet;
 template <typename T>
 class MeshFunction;
 class SubDomain;
-}
+} // namespace mesh
 
 namespace fem
 {
@@ -59,10 +60,6 @@ namespace fem
 /// Alternatively, the boundary may be specified by a _mesh::MeshFunction_
 /// over facets labeling all mesh facets together with a number that
 /// specifies which facets should be included in the boundary.
-///
-/// The third option is to attach the boundary information to the
-/// mesh. This is handled automatically when exporting a mesh from
-/// for example VMTK.
 ///
 /// The 'method' variable may be used to specify the type of method
 /// used to identify degrees of freedom on the boundary. Available
@@ -105,7 +102,7 @@ class DirichletBC : public common::Variable
 
 public:
   /// map type used by DirichletBC
-  typedef std::unordered_map<std::size_t, double> Map;
+  typedef std::unordered_map<std::size_t, PetscScalar> Map;
 
   /// Method of boundary condition application
   enum class Method
@@ -251,6 +248,23 @@ public:
   ///         "geometric" or "pointwise").
   Method method() const;
 
+  // FIXME: What about ghost indices?
+  // FIXME: Consider return a reference and caching this data
+  /// Return array of indices with dofs applied. Indices are local to the
+  /// process
+  ///
+  /// @return Eigen::Array<PetscInt, Eigen::Dynamic, 1>
+  ///         Dof indices with boundary condition applied.
+  Eigen::Array<PetscInt, Eigen::Dynamic, 1> dof_indices() const;
+
+  // FIXME: What about ghost indices?
+  // FIXME: Consider return a reference and caching this data
+  /// Return array of indices and dof values. Indices are local to the
+  /// process
+  std::pair<Eigen::Array<PetscInt, Eigen::Dynamic, 1>,
+            Eigen::Array<PetscScalar, Eigen::Dynamic, 1>>
+  bcs() const;
+
 private:
   class LocalData;
 
@@ -320,14 +334,11 @@ private:
     LocalData(const function::FunctionSpace& V);
 
     // Coefficients
-    std::vector<double> w;
-
-    // mesh::Facet dofs
-    std::vector<int64_t> facet_dofs;
+    std::vector<PetscScalar> w;
 
     // Coordinates for dofs
     EigenRowArrayXXd coordinates;
   };
 };
-}
-}
+} // namespace fem
+} // namespace dolfin

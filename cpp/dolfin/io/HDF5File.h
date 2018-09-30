@@ -12,6 +12,9 @@
 #include <dolfin/common/Variable.h>
 #include <dolfin/function/Function.h>
 #include <dolfin/la/PETScVector.h>
+#include <dolfin/mesh/Mesh.h>
+#include <dolfin/mesh/MeshFunction.h>
+#include <dolfin/mesh/MeshValueCollection.h>
 #include <memory>
 #include <string>
 #include <utility>
@@ -28,16 +31,11 @@ namespace function
 {
 // class Function;
 class FunctionSpace;
-}
+} // namespace function
 
 namespace mesh
 {
 class CellType;
-class Mesh;
-template <typename T>
-class MeshFunction;
-template <typename T>
-class MeshValueCollection;
 }
 
 namespace io
@@ -102,14 +100,15 @@ public:
   /// assumed that it is a Vector, and the function::Function will be filled
   /// from that Vector
   function::Function read(std::shared_ptr<const function::FunctionSpace> V,
-                          const std::string name);
+                          const std::string name) const;
 
   /// Read mesh::Mesh from file, using attribute data (e.g., cell type)
   /// stored in the HDF5 file. Optionally re-use any partition data
   /// in the file. This function requires all necessary data for
   /// constructing a mesh::Mesh to be present in the HDF5 file.
   mesh::Mesh read_mesh(MPI_Comm, const std::string data_path,
-                       bool use_partition_from_file) const;
+                       bool use_partition_from_file,
+                       const mesh::GhostMode ghost_mode) const;
 
   /// Construct mesh::Mesh with paths to topology and geometry datasets,
   /// and providing essential meta-data, e.g. geometric dimension
@@ -125,7 +124,8 @@ public:
                        const mesh::CellType& cell_type,
                        const std::int64_t expected_num_global_cells,
                        const std::int64_t expected_num_global_points,
-                       bool use_partition_from_file) const;
+                       bool use_partition_from_file,
+                       const mesh::GhostMode ghost_mode) const;
 
   /// Write mesh::MeshFunction to file in a format suitable for re-reading
   void write(const mesh::MeshFunction<std::size_t>& meshfunction,
@@ -144,20 +144,22 @@ public:
              const std::string name);
 
   /// Read mesh::MeshFunction from file
-  void read(mesh::MeshFunction<std::size_t>& meshfunction,
-            const std::string name) const;
+  mesh::MeshFunction<std::size_t>
+  read_mf_size_t(std::shared_ptr<const mesh::Mesh> mesh,
+                 const std::string name) const;
 
   /// Read mesh::MeshFunction from file
-  void read(mesh::MeshFunction<int>& meshfunction,
-            const std::string name) const;
+  mesh::MeshFunction<int> read_mf_int(std::shared_ptr<const mesh::Mesh> mesh,
+                                      const std::string name) const;
 
   /// Read mesh::MeshFunction from file
-  void read(mesh::MeshFunction<double>& meshfunction,
-            const std::string name) const;
+  mesh::MeshFunction<double>
+  read_mf_double(std::shared_ptr<const mesh::Mesh> mesh,
+                 const std::string name) const;
 
   /// Read mesh::MeshFunction from file
-  void read(mesh::MeshFunction<bool>& meshfunction,
-            const std::string name) const;
+  mesh::MeshFunction<bool> read_mf_bool(std::shared_ptr<const mesh::Mesh> mesh,
+                                        const std::string name) const;
 
   /// Write mesh::MeshValueCollection to file
   void write(const mesh::MeshValueCollection<std::size_t>& mesh_values,
@@ -172,16 +174,19 @@ public:
              const std::string name);
 
   /// Read mesh::MeshValueCollection from file
-  void read(mesh::MeshValueCollection<std::size_t>& mesh_values,
-            const std::string name) const;
+  mesh::MeshValueCollection<std::size_t>
+  read_mvc_size_t(std::shared_ptr<const mesh::Mesh> mesh,
+                  const std::string name) const;
 
   /// Read mesh::MeshValueCollection from file
-  void read(mesh::MeshValueCollection<double>& mesh_values,
-            const std::string name) const;
+  mesh::MeshValueCollection<double>
+  read_mvc_double(std::shared_ptr<const mesh::Mesh> mesh,
+                  const std::string name) const;
 
   /// Read mesh::MeshValueCollection from file
-  void read(mesh::MeshValueCollection<bool>& mesh_values,
-            const std::string name) const;
+  mesh::MeshValueCollection<bool>
+  read_mvc_bool(std::shared_ptr<const mesh::Mesh> mesh,
+                const std::string name) const;
 
   /// Check if dataset exists in HDF5 file
   bool has_dataset(const std::string dataset_name) const;
@@ -198,7 +203,6 @@ public:
 private:
   // Friend
   friend class XDMFFile;
-  friend class TimeSeries;
 
   // Write a mesh::MeshFunction to file
   template <typename T>
@@ -207,13 +211,9 @@ private:
 
   // Read a mesh::MeshFunction from file
   template <typename T>
-  void read_mesh_function(mesh::MeshFunction<T>& meshfunction,
-                          const std::string name) const;
-
-  // Write a mesh::MeshValueCollection to file (old format)
-  template <typename T>
-  void write_mesh_value_collection_old(
-      const mesh::MeshValueCollection<T>& mesh_values, const std::string name);
+  mesh::MeshFunction<T>
+  read_mesh_function(std::shared_ptr<const mesh::Mesh> mesh,
+                     const std::string name) const;
 
   // Write a mesh::MeshValueCollection to file (new version using vertex
   // indices)
@@ -224,13 +224,9 @@ private:
 
   // Read a mesh::MeshValueCollection from file
   template <typename T>
-  void read_mesh_value_collection(mesh::MeshValueCollection<T>& mesh_values,
-                                  const std::string name) const;
-
-  // Read a mesh::MeshValueCollection (old format)
-  template <typename T>
-  void read_mesh_value_collection_old(mesh::MeshValueCollection<T>& mesh_values,
-                                      const std::string name) const;
+  mesh::MeshValueCollection<T>
+  read_mesh_value_collection(std::shared_ptr<const mesh::Mesh> mesh,
+                             const std::string name) const;
 
   // Write contiguous data to HDF5 data set. Data is flattened into
   // a 1D array, e.g. [x0, y0, z0, x1, y1, z1] for a vector in 3D
@@ -278,5 +274,5 @@ void HDF5File::write_data(const std::string dataset_name,
                                global_size, use_mpi_io, chunking);
 }
 //---------------------------------------------------------------------------
-}
-}
+} // namespace io
+} // namespace dolfin

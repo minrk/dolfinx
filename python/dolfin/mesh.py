@@ -6,7 +6,13 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import ufl
-import dolfin.cpp as cpp
+
+from dolfin import cpp
+
+__all__ = [
+    "MeshFunction",
+    "MeshValueCollection"
+]
 
 _meshfunction_types = {"bool": cpp.mesh.MeshFunctionBool,
                        "size_t": cpp.mesh.MeshFunctionSizet,
@@ -52,7 +58,7 @@ def ufl_coordinate_element(self):
 
     """
     cell = self.ufl_cell()
-    degree = 1
+    degree = self.degree()
     return ufl.VectorElement("Lagrange", cell, degree,
                              dim=cell.geometric_dimension())
 

@@ -85,12 +85,12 @@ following way::
 
     import dolfin
     from dolfin import *
+    from dolfin.io import XDMFFile
 
     # Load mesh and subdomains
     xdmf = XDMFFile(MPI.comm_world, "../dolfin_fine.xdmf")
-    mesh = xdmf.read_mesh(MPI.comm_world)
-    sub_domains = MeshFunction("size_t", mesh, mesh.topology.dim - 1, 0)
-    xdmf.read(sub_domains)
+    mesh = xdmf.read_mesh(MPI.comm_world, dolfin.cpp.mesh.GhostMode.none)
+    sub_domains = xdmf.read_mf_size_t(mesh)
 
     cmap = dolfin.fem.create_coordinate_map(mesh.ufl_domain())
     mesh.geometry.coord_mapping = cmap
@@ -143,7 +143,7 @@ formulation of the Stokes equations are defined as follows::
     (u, p) = TrialFunctions(W)
     (v, q) = TestFunctions(W)
     f = Constant((0, 0))
-    a = (inner(grad(u), grad(v)) - div(v)*p + q*div(u))*dx
+    a = (inner(grad(u), grad(v)) - inner(p, div(v)) + inner(div(u), q))*dx
     L = inner(f, v)*dx
 
 We also need to create a :py:class:`Function
@@ -160,7 +160,8 @@ a deep copy for further computations on the coefficient vectors::
 
     # Compute solution
     w = Function(W)
-    solve(a == L, w, bcs)
+    solve(a == L, w, bcs, petsc_options={"ksp_type": "preonly",
+          "pc_type": "lu", "pc_factor_mat_solver_type": "mumps"})
 
     # Split the mixed solution using deepcopy
     # (needed for further computation on coefficient vector)
@@ -168,13 +169,13 @@ a deep copy for further computations on the coefficient vectors::
 
 We can calculate the :math:`L^2` norms of u and p as follows::
 
-    print("Norm of velocity coefficient vector: %.15g" % u.vector().norm("l2"))
-    print("Norm of pressure coefficient vector: %.15g" % p.vector().norm("l2"))
+    print("Norm of velocity coefficient vector: %.15g" % u.vector().norm(dolfin.cpp.la.Norm.l2))
+    print("Norm of pressure coefficient vector: %.15g" % p.vector().norm(dolfin.cpp.la.Norm.l2))
 
     # Check pressure norm
-    pnorm = p.vector().norm("l2")
+    pnorm = p.vector().norm(dolfin.cpp.la.Norm.l2)
     import numpy as np
-    assert np.isclose(pnorm, 4116.91298427)
+    assert np.isclose(pnorm, 4147.69457577)
 
 Finally, we can save and plot the solutions::
 

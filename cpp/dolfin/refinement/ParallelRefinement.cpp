@@ -221,9 +221,8 @@ void ParallelRefinement::create_new_vertices()
   Eigen::Map<EigenRowArrayXXd> old_tmp(_new_vertex_coordinates.data(),
                                        _new_vertex_coordinates.size() / gdim,
                                        gdim);
-  EigenRowArrayXXd tmp
-      = mesh::DistributedMeshTools::reorder_values_by_global_indices(
-          _mesh.mpi_comm(), old_tmp, global_indices);
+  EigenRowArrayXXd tmp = mesh::DistributedMeshTools::reorder_by_global_indices(
+      _mesh.mpi_comm(), old_tmp, global_indices);
 
   _new_vertex_coordinates
       = std::vector<double>(tmp.data(), tmp.data() + tmp.size());
@@ -246,7 +245,7 @@ mesh::Mesh ParallelRefinement::build_local() const
                                                 num_cells, num_cell_vertices);
 
   mesh::Mesh mesh(_mesh.mpi_comm(), _mesh.type().cell_type(), geometry,
-                  topology);
+                  topology, {}, _mesh.get_ghost_mode());
 
   return mesh;
 }
@@ -274,7 +273,7 @@ mesh::Mesh ParallelRefinement::partition(bool redistribute) const
 
   return mesh::MeshPartitioning::build_distributed_mesh(
       _mesh.mpi_comm(), _mesh.type().cell_type(), points, cells,
-      global_cell_indices, _mesh.ghost_mode());
+      global_cell_indices, _mesh.get_ghost_mode());
 }
 //-----------------------------------------------------------------------------
 void ParallelRefinement::new_cells(const std::vector<std::size_t>& idx)

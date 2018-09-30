@@ -1,6 +1,7 @@
 set(HEADERS
   Cell.h
   CellType.h
+  CoordinateDofs.h
   DistributedMeshTools.h
   dolfin_mesh.h
   Edge.h
@@ -8,14 +9,12 @@ set(HEADERS
   Facet.h
   HexahedronCell.h
   IntervalCell.h
-  LocalMeshValueCollection.h
   MeshConnectivity.h
   MeshEntity.h
   MeshFunction.h
   MeshGeometry.h
   MeshIterator.h
   Mesh.h
-  MeshOrdering.h
   MeshPartitioning.h
   MeshQuality.h
   MeshTopology.h
@@ -33,6 +32,7 @@ set(HEADERS
 
 set(SOURCES
   CellType.cpp
+  CoordinateDofs.cpp
   DistributedMeshTools.cpp
   Edge.cpp
   Face.cpp
@@ -44,10 +44,10 @@ set(SOURCES
   MeshEntity.cpp
   MeshFunction.cpp
   MeshGeometry.cpp
-  MeshOrdering.cpp
   MeshPartitioning.cpp
   MeshQuality.cpp
   MeshTopology.cpp
+  PartitionData.cpp
   PeriodicBoundaryComputation.cpp
   PointCell.cpp
   QuadrilateralCell.cpp

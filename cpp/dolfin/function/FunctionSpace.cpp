@@ -108,7 +108,7 @@ void FunctionSpace::interpolate_from_any(
   std::size_t gdim = _mesh->geometry().dim();
 
   // Initialize local arrays
-  std::vector<double> cell_coefficients(_dofmap->max_element_dofs());
+  std::vector<PetscScalar> cell_coefficients(_dofmap->max_element_dofs());
 
   // Iterate over mesh and interpolate on each cell
   EigenRowArrayXXd coordinate_dofs;
@@ -163,14 +163,12 @@ void FunctionSpace::interpolate(la::PETScVector& expansion_coefficients,
   // Initialize vector of expansion coefficients
   if (expansion_coefficients.size() != _dofmap->global_dimension())
   {
-    log::dolfin_error("FunctionSpace.cpp",
-                      "interpolate function into function space",
-                      "Wrong size of vector");
+    throw std::runtime_error("Cannot interpolate function into function space. "
+                             "Wrong size of vector");
   }
-  expansion_coefficients.zero();
+  expansion_coefficients.set(0.0);
 
   std::shared_ptr<const FunctionSpace> v_fs = v.function_space();
-
   interpolate_from_any(expansion_coefficients, v);
 
   // Finalise changes
@@ -216,17 +214,11 @@ FunctionSpace::sub(const std::vector<std::size_t>& component) const
   return new_sub_space;
 }
 //-----------------------------------------------------------------------------
-std::shared_ptr<FunctionSpace> FunctionSpace::collapse() const
-{
-  std::unordered_map<std::size_t, std::size_t> collapsed_dofs;
-  return collapse(collapsed_dofs);
-}
-//-----------------------------------------------------------------------------
-std::shared_ptr<FunctionSpace> FunctionSpace::collapse(
-    std::unordered_map<std::size_t, std::size_t>& collapsed_dofs) const
+std::pair<std::shared_ptr<FunctionSpace>,
+          std::unordered_map<std::size_t, std::size_t>>
+FunctionSpace::collapse() const
 {
   assert(_mesh);
-
   if (_component.empty())
   {
     log::dolfin_error("FunctionSpace.cpp", "collapse function space",
@@ -234,13 +226,16 @@ std::shared_ptr<FunctionSpace> FunctionSpace::collapse(
   }
 
   // Create collapsed DofMap
-  std::shared_ptr<fem::GenericDofMap> collapsed_dofmap(
-      _dofmap->collapse(collapsed_dofs, *_mesh));
+  std::shared_ptr<fem::GenericDofMap> collapsed_dofmap;
+  std::unordered_map<std::size_t, std::size_t> collapsed_dofs;
+  std::tie(collapsed_dofmap, collapsed_dofs) = _dofmap->collapse(*_mesh);
 
   // Create new FunctionSpace and return
-  std::shared_ptr<FunctionSpace> collapsed_sub_space(
-      new FunctionSpace(_mesh, _element, collapsed_dofmap));
-  return collapsed_sub_space;
+  auto collapsed_sub_space
+      = std::make_shared<FunctionSpace>(_mesh, _element, collapsed_dofmap);
+
+  return std::make_pair(std::move(collapsed_sub_space),
+                        std::move(collapsed_dofs));
 }
 //-----------------------------------------------------------------------------
 std::vector<std::size_t> FunctionSpace::component() const { return _component; }
@@ -262,8 +257,7 @@ EigenRowArrayXXd FunctionSpace::tabulate_dof_coordinates() const
   // Get local size
   assert(_dofmap);
   std::size_t bs = _dofmap->block_size();
-  std::size_t local_size
-      = bs * _dofmap->index_map()->size(common::IndexMap::MapSize::OWNED);
+  std::size_t local_size = bs * _dofmap->index_map()->size_local();
 
   // Dof coordinate on reference element
   const EigenRowArrayXXd& X = _element->dof_reference_coordinates();
@@ -297,8 +291,8 @@ EigenRowArrayXXd FunctionSpace::tabulate_dof_coordinates() const
     // Copy dof coordinates into vector
     for (Eigen::Index i = 0; i < dofs.size(); ++i)
     {
-      const dolfin::la_index_t dof = dofs[i];
-      if (dof < (dolfin::la_index_t)local_size)
+      const PetscInt dof = dofs[i];
+      if (dof < (PetscInt)local_size)
         x.row(dof) = coordinates.row(i);
     }
   }
@@ -306,7 +300,7 @@ EigenRowArrayXXd FunctionSpace::tabulate_dof_coordinates() const
   return x;
 }
 //-----------------------------------------------------------------------------
-void FunctionSpace::set_x(la::PETScVector& x, double value,
+void FunctionSpace::set_x(la::PETScVector& x, PetscScalar value,
                           std::size_t component) const
 {
   assert(_mesh);
@@ -314,7 +308,7 @@ void FunctionSpace::set_x(la::PETScVector& x, double value,
   assert(_element);
 
   const std::size_t gdim = _mesh->geometry().dim();
-  std::vector<double> x_values;
+  std::vector<PetscScalar> x_values;
 
   // Dof coordinate on reference element
   const EigenRowArrayXXd& X = _element->dof_reference_coordinates();

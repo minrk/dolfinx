@@ -4,9 +4,9 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import pytest
-import numpy
-from dolfin import *
+from math import sqrt, pi
+from dolfin import (UnitIntervalMesh, UnitSquareMesh, UnitCubeMesh, MeshQuality, MPI, Cells,
+                    RectangleMesh, Point, CellType, cpp)
 from dolfin_utils.test import skip_in_parallel
 
 
@@ -65,10 +65,12 @@ def test_radius_ratio_min_radius_ratio_max():
     x[4] = mesh1d.geometry.points[3]
 
     # Create 2D mesh with one equilateral triangle
-    mesh2d = RectangleMesh.create(MPI.comm_world, [Point(0, 0), Point(1, 1)], [
-                                  1, 1], CellType.Type.triangle, 'left')
+    mesh2d = RectangleMesh.create(MPI.comm_world, [Point(0, 0)._cpp_object,
+                                                   Point(1, 1)._cpp_object],
+                                  [1, 1], CellType.Type.triangle,
+                                  cpp.mesh.GhostMode.none, 'left')
     x = mesh2d.geometry.points
-    x[3] += 0.5*(sqrt(3.0)-1.0)
+    x[3] += 0.5 * (sqrt(3.0) - 1.0)
 
     # Create 3D mesh with regular tetrahedron and degenerate cells
     mesh3d = UnitCubeMesh(MPI.comm_self, 1, 1, 1)
@@ -80,7 +82,7 @@ def test_radius_ratio_min_radius_ratio_max():
     assert round(rmax - 1.0, 7) == 0
 
     rmin, rmax = MeshQuality.radius_ratio_min_max(mesh2d)
-    assert round(rmin - 2.0*sqrt(2.0)/(2.0+sqrt(2.0)), 7) == 0
+    assert round(rmin - 2.0 * sqrt(2.0) / (2.0 + sqrt(2.0)), 7) == 0
     assert round(rmax - 1.0, 7) == 0
 
     rmin, rmax = MeshQuality.radius_ratio_min_max(mesh3d)
@@ -92,5 +94,5 @@ def test_dihedral_angles_min_max():
     # Create 3D mesh with regular tetrahedron
     mesh = UnitCubeMesh(MPI.comm_world, 2, 2, 2)
     dang_min, dang_max = MeshQuality.dihedral_angles_min_max(mesh)
-    assert round(dang_min*(180/numpy.pi) - 45.0) == 0
-    assert round(dang_max*(180/numpy.pi) - 90.0) == 0
+    assert round(dang_min * (180 / pi) - 45.0) == 0
+    assert round(dang_max * (180 / pi) - 90.0) == 0

@@ -23,8 +23,9 @@ du/dn(x, y) = sin(5*x) for y = 0 or y = 1
 
 
 from dolfin import *
+from dolfin.io import XDMFFile
 import math
-parameters["form_compiler"]["representation"] = "uflacs"
+# parameters["form_compiler"]["representation"] = "uflacs"
 
 def compute(nsteps, coordinate_degree, element_degree, gdim):
     # Create mesh and define function space
@@ -71,7 +72,7 @@ def compute_rates():
         for element_degree in (1, 2):
             print("\nUsing coordinate degree %d, element degree %d" % (coordinate_degree, element_degree))
             ufile = XDMFFile(MPI.comm_world, "poisson-disc-degree-x%d-e%d.xdmf" % (coordinate_degree, element_degree))
-            encoding = XDMFFile.Encoding.HDF5 if has_hdf5() else XDMFFile.Encoding.ASCII
+            encoding = XDMFFile.Encoding.HDF5 if has_hdf5 else XDMFFile.Encoding.ASCII
             preverr = None
             prevh = None
             for i, nsteps in enumerate((1, 8, 64)):
@@ -86,11 +87,11 @@ def compute_rates():
                 prevh = h
 
                 # Save solution to file
-                u.rename('u', 'u')
+                u.rename('u')
 
                 if MPI.size(MPI.comm_world) > 1 and encoding == XDMFFile.Encoding.ASCII:
                     print("XDMF file output not supported in parallel without HDF5")
                 else:
-                    ufile.write(u, encoding)
+                    ufile.write(u, encoding=encoding)
 
 compute_rates()

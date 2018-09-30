@@ -11,6 +11,7 @@ smoothed aggregation algerbaric multigrid."""
 import numpy as np
 import dolfin
 from dolfin import *
+from dolfin.io import XDMFFile
 from dolfin.la import (VectorSpaceBasis, PETScVector, PETScOptions,
                        PETScKrylovSolver)
 from dolfin.fem.assembling import assemble_system
@@ -31,10 +32,10 @@ def build_nullspace(V, x):
 
     # Build rotational null space basis
     V.sub(0).set_x(nullspace_basis[3], -1.0, 1)
-    V.sub(1).set_x(nullspace_basis[3],  1.0, 0)
-    V.sub(0).set_x(nullspace_basis[4],  1.0, 2)
+    V.sub(1).set_x(nullspace_basis[3], 1.0, 0)
+    V.sub(0).set_x(nullspace_basis[4], 1.0, 2)
     V.sub(2).set_x(nullspace_basis[4], -1.0, 0)
-    V.sub(2).set_x(nullspace_basis[5],  1.0, 1)
+    V.sub(2).set_x(nullspace_basis[5], 1.0, 1)
     V.sub(1).set_x(nullspace_basis[5], -1.0, 2)
 
     for x in nullspace_basis:
@@ -52,8 +53,10 @@ def build_nullspace(V, x):
 # XDMFFile(MPI.comm_world, "../pulley.xdmf").read(mesh)
 
 # mesh = UnitCubeMesh(2, 2, 2)
-mesh = BoxMesh.create(MPI.comm_world, [Point(0, 0, 0), Point(2, 1, 1)], [
-                      12, 12, 12], CellType.Type.tetrahedron)
+mesh = BoxMesh.create(MPI.comm_world, [Point(0, 0, 0)._cpp_object,
+                                       Point(2, 1, 1)._cpp_object],
+                      [12, 12, 12], CellType.Type.tetrahedron,
+                      dolfin.cpp.mesh.GhostMode.none)
 cmap = dolfin.fem.create_coordinate_map(mesh.ufl_domain())
 mesh.geometry.coord_mapping = cmap
 
@@ -80,14 +83,14 @@ f = Expression(("0.0", "1.0e10", "0.0"), degree=2)
 # Elasticity parameters
 E = 1.0e9
 nu = 0.0
-mu = E/(2.0*(1.0 + nu))
-lmbda = E*nu/((1.0 + nu)*(1.0 - 2.0*nu))
+mu = E / (2.0 * (1.0 + nu))
+lmbda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
 
 # Stress computation
 
 
 def sigma(v):
-    return 2.0*mu*sym(grad(v)) + lmbda*tr(sym(grad(v)))*Identity(len(v))
+    return 2.0 * mu * sym(grad(v)) + lmbda * tr(sym(grad(v))) * Identity(len(v))
 
 
 # Create function space
@@ -96,8 +99,8 @@ V = VectorFunctionSpace(mesh, "Lagrange", 1)
 # Define variational problem
 u = TrialFunction(V)
 v = TestFunction(V)
-a = inner(sigma(u), grad(v))*dx
-L = inner(f, v)*dx
+a = inner(sigma(u), grad(v)) * dx
+L = inner(f, v) * dx
 
 # Set up boundary condition on inner surface
 c = Constant((0.0, 0.0, 0.0))
@@ -117,9 +120,9 @@ null_space = build_nullspace(V, u.vector())
 
 # Attach near nullspace to matrix
 A.set_near_nullspace(null_space)
-# as_backend_type(A).set_near_nullspace(null_space)
 
 # Set solver options
+PETScOptions.set("ksp_view")
 PETScOptions.set("ksp_type", "cg")
 PETScOptions.set("ksp_rtol", 1.0e-12)
 PETScOptions.set("pc_type", "gamg")
@@ -148,9 +151,9 @@ solver.solve(u.vector(), b)
 
 # Save solution to XDMF format
 file = XDMFFile(MPI.comm_world, "elasticity.xdmf")
-file.write(u, XDMFFile.Encoding.ASCII)
+file.write(u)
 
-unorm = u.vector().norm("l2")
+unorm = u.vector().norm(dolfin.cpp.la.Norm.l2)
 if MPI.rank(mesh.mpi_comm()) == 0:
     print("Solution vector norm:", unorm)
 
@@ -166,7 +169,7 @@ if MPI.rank(mesh.mpi_comm()) == 0:
 # File("stress.pvd") << stress
 
 # Plot solution
-import matplotlib.pyplot as plt
-import dolfin.plotting
-dolfin.plotting.plot(u)
-plt.show()
+# import matplotlib.pyplot as plt
+# import dolfin.plotting
+# dolfin.plotting.plot(u)
+# plt.show()

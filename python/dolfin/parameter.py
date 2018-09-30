@@ -7,12 +7,10 @@
 
 """FIXME: document"""
 
-import dolfin.cpp
 from ffc import default_jit_parameters
-from dolfin.cpp.parameter import parameters, Parameters
 
-
-# __all__ = ["parameters", "Parameters"]
+from dolfin import common
+from dolfin import cpp
 
 
 #  Extend cpp.Parameters with a __getitem__ method
@@ -33,7 +31,7 @@ def __getitem__(self, key):
 # FIXME: This is probably better handled on the C++ side using
 # py::dict
 def update(self, params):
-    if isinstance(params, dolfin.cpp.parameter.Parameters):
+    if isinstance(params, cpp.parameter.Parameters):
         self._update(params)
     elif isinstance(params, dict):
         for key in params:
@@ -46,8 +44,8 @@ def update(self, params):
 
 
 # Extend the cpp.parameter.Parameters class and clean-up
-dolfin.cpp.parameter.Parameters.__getitem__ = __getitem__
-dolfin.cpp.parameter.Parameters.update = update
+cpp.parameter.Parameters.__getitem__ = __getitem__
+cpp.parameter.Parameters.update = update
 del __getitem__, update
 
 
@@ -57,10 +55,10 @@ def ffc_default_parameters():
 
     # FIXME: intialising MPI because setting parameters makes MPI
     # calls, possibly via the log systems. Needs to be fixed.
-    dolfin.cpp.MPI.init()
+    cpp.MPI.init()
 
     d = default_jit_parameters()
-    p = Parameters("form_compiler")
+    p = cpp.parameter.Parameters("form_compiler")
 
     typemap = {"quadrature_rule": "", "quadrature_degree": 0,
                "precision": 0}
@@ -73,9 +71,14 @@ def ffc_default_parameters():
         else:
             p.add(key, value)
 
+    # Update the scalar type according to the mode (real or complex)
+    p["scalar_type"] = "double complex" if common.has_petsc_complex else "double"
+
     return p
 
 
 # Add form compiler parameters to global parameter set
-if not parameters.has_parameter_set("form_compiler"):
-    parameters.add(ffc_default_parameters())
+if not cpp.parameter.parameters.has_parameter_set("form_compiler"):
+    cpp.parameter.parameters.add(ffc_default_parameters())
+
+parameters = cpp.parameter.parameters

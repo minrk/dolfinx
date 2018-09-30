@@ -8,6 +8,7 @@
 
 #include <dolfin/common/types.h>
 #include <memory>
+#include <petscsys.h>
 #include <ufc.h>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <vector>
@@ -26,7 +27,7 @@ public:
   /// Create finite element from UFC finite element (data may be shared)
   /// @param element (ufc::finite_element)
   ///  UFC finite element
-  FiniteElement(std::shared_ptr<const ufc::finite_element> element);
+  FiniteElement(std::shared_ptr<const ufc_finite_element> element);
 
   /// Destructor
   virtual ~FiniteElement() {}
@@ -38,16 +39,17 @@ public:
   std::string signature() const
   {
     assert(_ufc_element);
-    return _ufc_element->signature();
+    assert(_ufc_element->signature);
+    return _ufc_element->signature;
   }
 
-  // FIXME: Avoid exposing UFC type 'ufc::cell'
+  // FIXME: Avoid exposing UFC enum
   /// Return the cell shape
   /// @return ufc::shape
-  ufc::shape cell_shape() const
+  ufc_shape cell_shape() const
   {
     assert(_ufc_element);
-    return _ufc_element->cell_shape();
+    return _ufc_element->cell_shape;
   }
 
   /// Return the topological dimension of the cell shape
@@ -55,7 +57,7 @@ public:
   std::size_t topological_dimension() const
   {
     assert(_ufc_element);
-    return _ufc_element->topological_dimension();
+    return _ufc_element->topological_dimension;
   }
 
   /// Return the dimension of the finite element function space
@@ -63,7 +65,7 @@ public:
   std::size_t space_dimension() const
   {
     assert(_ufc_element);
-    return _ufc_element->space_dimension();
+    return _ufc_element->space_dimension;
   }
 
   /// Return the value size, e.g. 1 for a scalar function, 2 for a 2D
@@ -71,7 +73,7 @@ public:
   std::size_t value_size() const
   {
     assert(_ufc_element);
-    return _ufc_element->value_size();
+    return _ufc_element->value_size;
   }
 
   /// Return the value size, e.g. 1 for a scalar function, 2 for a 2D
@@ -79,14 +81,14 @@ public:
   std::size_t reference_value_size() const
   {
     assert(_ufc_element);
-    return _ufc_element->reference_value_size();
+    return _ufc_element->reference_value_size;
   }
 
   /// Return the rank of the value space
   std::size_t value_rank() const
   {
     assert(_ufc_element);
-    return _ufc_element->value_rank();
+    return _ufc_element->value_rank;
   }
 
   /// Return the dimension of the value space for axis i
@@ -102,14 +104,14 @@ public:
   std::size_t degree() const
   {
     assert(_ufc_element);
-    return _ufc_element->degree();
+    return _ufc_element->degree;
   }
 
   /// Return the finite elemeent family
   std::string family() const
   {
     assert(_ufc_element);
-    return _ufc_element->family();
+    return _ufc_element->family;
   }
 
   /// Evaluate all basis functions at given point in reference cell
@@ -162,15 +164,18 @@ public:
   ///         The coordinates of all dofs on the reference cell.
   const EigenRowArrayXXd& dof_reference_coordinates() const { return _refX; }
 
-  // FIXME: pass coordinate map
-  /// TODO: Remove? Document. See:
-  /// ffc/uflacs/backends/ufc/evaluatedof.py:_change_variables()
-  void map_dofs(double* values, const Eigen::Ref<const EigenRowArrayXXd>& vals,
-                const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs) const
+  /// Map values of field from physical to reference space which has
+  /// been evaluated at points given by dof_reference_coordinates()
+  void transform_values(
+      PetscScalar* reference_values,
+      const Eigen::Ref<const Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                          Eigen::Dynamic, Eigen::RowMajor>>&
+          physical_values,
+      const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs) const
   {
     assert(_ufc_element);
-    _ufc_element->map_dofs(values, vals.data(), coordinate_dofs.data(), 1,
-                           nullptr);
+    _ufc_element->transform_values(reference_values, physical_values.data(),
+                                   coordinate_dofs.data(), 1, nullptr);
   }
 
   /// Return the number of sub elements (for a mixed element)
@@ -179,7 +184,7 @@ public:
   std::size_t num_sub_elements() const
   {
     assert(_ufc_element);
-    return _ufc_element->num_sub_elements();
+    return _ufc_element->num_sub_elements;
   }
 
   //--- DOLFIN-specific extensions of the interface ---
@@ -189,21 +194,10 @@ public:
 
   /// Create a new finite element for sub element i (for a mixed
   /// element)
-  std::shared_ptr<FiniteElement> create_sub_element(std::size_t i) const
-  {
-    assert(_ufc_element);
-    std::shared_ptr<ufc::finite_element> ufc_element(
-        _ufc_element->create_sub_element(i));
-    return std::make_shared<FiniteElement>(ufc_element);
-  }
+  std::unique_ptr<FiniteElement> create_sub_element(std::size_t i) const;
 
   /// Create a new class instance
-  std::shared_ptr<FiniteElement> create() const
-  {
-    assert(_ufc_element);
-    std::shared_ptr<ufc::finite_element> ufc_element(_ufc_element->create());
-    return std::make_shared<FiniteElement>(ufc_element);
-  }
+  std::unique_ptr<FiniteElement> create() const;
 
   /// Extract sub finite element for component
   std::shared_ptr<FiniteElement>
@@ -211,7 +205,7 @@ public:
 
 private:
   // UFC finite element
-  std::shared_ptr<const ufc::finite_element> _ufc_element;
+  std::shared_ptr<const ufc_finite_element> _ufc_element;
 
   // Dof coordinates on the reference element
   EigenRowArrayXXd _refX;
@@ -224,5 +218,5 @@ private:
   // Simple hash of the signature string
   std::size_t _hash;
 };
-}
-}
+} // namespace fem
+} // namespace dolfin

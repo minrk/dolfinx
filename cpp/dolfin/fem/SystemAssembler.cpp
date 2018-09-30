@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
+#include <dolfin/common/types.h>
 #include "SystemAssembler.h"
 #include "AssemblerBase.h"
 #include "DirichletBC.h"
@@ -15,7 +16,6 @@
 #include <array>
 #include <dolfin/common/ArrayView.h>
 #include <dolfin/common/Timer.h>
-#include <dolfin/common/types.h>
 #include <dolfin/function/FunctionSpace.h>
 #include <dolfin/function/GenericFunction.h>
 #include <dolfin/la/PETScMatrix.h>
@@ -26,6 +26,7 @@
 #include <dolfin/mesh/Mesh.h>
 #include <dolfin/mesh/MeshFunction.h>
 #include <dolfin/mesh/MeshIterator.h>
+#include <dolfin/mesh/MeshPartitioning.h>
 #include <dolfin/mesh/SubDomain.h>
 
 using namespace dolfin;
@@ -69,8 +70,8 @@ void SystemAssembler::check_arity(std::shared_ptr<const Form> a,
   {
     if (a->rank() != 2)
     {
-      log::dolfin_error("SystemAssembler.cpp", "assemble system",
-                        "expected a bilinear form for a");
+      throw std::runtime_error(
+          "Assemble system. Expected a bilinear form for a");
     }
   }
 
@@ -79,8 +80,8 @@ void SystemAssembler::check_arity(std::shared_ptr<const Form> a,
   {
     if (L->rank() != 1)
     {
-      log::dolfin_error("SystemAssembler.cpp", "assemble system",
-                        "expected a linear form for L");
+      throw std::runtime_error(
+          "Assemble system. Expected a bilinear form for L");
     }
   }
 }
@@ -122,7 +123,6 @@ void SystemAssembler::assemble(la::PETScMatrix* A, la::PETScVector* b,
   // Get mesh
   assert(_a->mesh());
   const mesh::Mesh& mesh = *(_a->mesh());
-  assert(mesh.ordered());
 
   // Get cell domains
   std::shared_ptr<const mesh::MeshFunction<std::size_t>> cell_domains
@@ -152,9 +152,8 @@ void SystemAssembler::assemble(la::PETScMatrix* A, la::PETScVector* b,
   // Check that forms share a function space
   if (*_a->function_space(0) != *_l->function_space(0))
   {
-    log::dolfin_error(
-        "SystemAssembler.cpp", "assemble system",
-        "expected forms (a, L) to share a function::FunctionSpace");
+    throw std::runtime_error(
+        "Expected forms (a, L) to share a function::FunctionSpace");
   }
 
   // Create data structures for local assembly data
@@ -164,8 +163,7 @@ void SystemAssembler::assemble(la::PETScMatrix* A, la::PETScVector* b,
   if (_a->integrals().num_vertex_integrals() > 0
       or _l->integrals().num_vertex_integrals() > 0)
   {
-    log::dolfin_error("SystemAssembler.cpp", "assemble system",
-                      "Point integrals are not supported (yet)");
+    throw std::runtime_error("Point integrals are not supported (yet)");
   }
 
   // Gather UFC  objects
@@ -237,12 +235,11 @@ void SystemAssembler::assemble(la::PETScMatrix* A, la::PETScVector* b,
   //        should we raise "not implemented error" here?
   if (x0)
   {
-    assert(x0->size()
-                  == _a->function_space(1)->dofmap()->global_dimension());
+    assert(x0->size() == _a->function_space(1)->dofmap()->global_dimension());
 
     const std::size_t num_bc_dofs = boundary_values[0].size();
-    std::vector<dolfin::la_index_t> bc_indices;
-    std::vector<double> bc_values;
+    std::vector<PetscInt> bc_indices;
+    std::vector<PetscScalar> bc_values;
     bc_indices.reserve(num_bc_dofs);
     bc_values.reserve(num_bc_dofs);
 
@@ -254,7 +251,7 @@ void SystemAssembler::assemble(la::PETScMatrix* A, la::PETScVector* b,
     }
 
     // Modify bc values
-    std::vector<double> x0_values(num_bc_dofs);
+    std::vector<PetscScalar> x0_values(num_bc_dofs);
     x0->get_local(x0_values.data(), num_bc_dofs, bc_indices.data());
     for (std::size_t i = 0; i < num_bc_dofs; i++)
       boundary_values[0][bc_indices[i]] = x0_values[i] - bc_values[i];
@@ -298,7 +295,6 @@ void SystemAssembler::cell_wise_assembly(
   const mesh::Mesh& mesh = *(ufc[0]->dolfin_form.mesh());
 
   // Initialize entities if using external facet integrals
-  assert(mesh.ordered());
   bool has_exterior_facet_integrals
       = ufc[0]->dolfin_form.integrals().num_exterior_facet_integrals() > 0
         or ufc[1]->dolfin_form.integrals().num_exterior_facet_integrals() > 0;
@@ -317,17 +313,17 @@ void SystemAssembler::cell_wise_assembly(
   dofmaps[1].push_back(ufc[1]->dolfin_form.function_space(0)->dofmap().get());
 
   // Vector to hold dof map for a cell
-  std::array<std::vector<common::ArrayView<const dolfin::la_index_t>>, 2>
+  std::array<std::vector<common::ArrayView<const PetscInt>>, 2>
       cell_dofs
-      = {{std::vector<common::ArrayView<const dolfin::la_index_t>>(2),
-          std::vector<common::ArrayView<const dolfin::la_index_t>>(1)}};
+      = {{std::vector<common::ArrayView<const PetscInt>>(2),
+          std::vector<common::ArrayView<const PetscInt>>(1)}};
 
   // Create pointers to hold integral objects
-  std::array<const ufc::cell_integral*, 2> cell_integrals
+  std::array<const ufc_cell_integral*, 2> cell_integrals
       = {{ufc[0]->dolfin_form.integrals().cell_integral().get(),
           ufc[1]->dolfin_form.integrals().cell_integral().get()}};
 
-  std::array<const ufc::exterior_facet_integral*, 2> exterior_facet_integrals
+  std::array<const ufc_exterior_facet_integral*, 2> exterior_facet_integrals
       = {{ufc[0]->dolfin_form.integrals().exterior_facet_integral().get(),
           ufc[1]->dolfin_form.integrals().exterior_facet_integral().get()}};
 
@@ -394,7 +390,7 @@ void SystemAssembler::cell_wise_assembly(
       {
         // Update to current cell
         ufc[form]->update(cell, coordinate_dofs,
-                          cell_integrals[form]->enabled_coefficients());
+                          cell_integrals[form]->enabled_coefficients);
 
         // Tabulate cell tensor
         cell_integrals[form]->tabulate_tensor(
@@ -447,7 +443,7 @@ void SystemAssembler::cell_wise_assembly(
             // Update to current cell
             ufc[form]->update(
                 cell, coordinate_dofs,
-                exterior_facet_integrals[form]->enabled_coefficients());
+                exterior_facet_integrals[form]->enabled_coefficients);
 
             // Tabulate exterior facet tensor
             exterior_facet_integrals[form]->tabulate_tensor(
@@ -490,9 +486,9 @@ void SystemAssembler::facet_wise_assembly(
   const mesh::Mesh& mesh = *(ufc[0]->dolfin_form.mesh());
 
   // Sanity check of ghost mode (proper check in AssemblerBase::check)
-  assert(mesh.ghost_mode() == "shared_vertex"
-                || mesh.ghost_mode() == "shared_facet"
-                || MPI::size(mesh.mpi_comm()) == 1);
+  assert(mesh.get_ghost_mode() == mesh::GhostMode::shared_vertex
+         or mesh.get_ghost_mode() == mesh::GhostMode::shared_facet
+         or MPI::size(mesh.mpi_comm()) == 1);
 
   // Compute facets and facet - cell connectivity if not already
   // computed
@@ -510,11 +506,10 @@ void SystemAssembler::facet_wise_assembly(
   dofmaps[1].push_back(ufc[1]->dolfin_form.function_space(0)->dofmap().get());
 
   // Cell dofmaps [form][cell][form dim]
-  std::
-      array<std::array<std::vector<common::ArrayView<const dolfin::la_index_t>>,
-                       2>,
-            2>
-          cell_dofs;
+  std::array<
+      std::array<std::vector<common::ArrayView<const PetscInt>>, 2>,
+      2>
+      cell_dofs;
   cell_dofs[0][0].resize(2);
   cell_dofs[0][1].resize(2);
   cell_dofs[1][0].resize(1);
@@ -526,7 +521,7 @@ void SystemAssembler::facet_wise_assembly(
   std::array<std::size_t, 2> local_facet;
 
   // Vectors to hold dofs for macro cells
-  std::array<std::vector<std::vector<dolfin::la_index_t>>, 2> macro_dofs;
+  std::array<std::vector<std::vector<PetscInt>>, 2> macro_dofs;
   macro_dofs[0].resize(2);
   macro_dofs[1].resize(1);
 
@@ -534,13 +529,13 @@ void SystemAssembler::facet_wise_assembly(
   std::vector<std::size_t> num_dofs(2);
 
   // Holders for UFC integrals
-  std::array<const ufc::cell_integral*, 2> cell_integrals
+  std::array<const ufc_cell_integral*, 2> cell_integrals
       = {{ufc[0]->dolfin_form.integrals().cell_integral().get(),
           ufc[1]->dolfin_form.integrals().cell_integral().get()}};
-  std::array<const ufc::exterior_facet_integral*, 2> exterior_facet_integrals
+  std::array<const ufc_exterior_facet_integral*, 2> exterior_facet_integrals
       = {{ufc[0]->dolfin_form.integrals().exterior_facet_integral().get(),
           ufc[1]->dolfin_form.integrals().exterior_facet_integral().get()}};
-  std::array<const ufc::interior_facet_integral*, 2> interior_facet_integrals
+  std::array<const ufc_interior_facet_integral*, 2> interior_facet_integrals
       = {{ufc[0]->dolfin_form.integrals().interior_facet_integral().get(),
           ufc[1]->dolfin_form.integrals().interior_facet_integral().get()}};
 
@@ -730,15 +725,15 @@ void SystemAssembler::facet_wise_assembly(
                                     vector_size, compute_cell_tensor);
 
       // Modify local tensors for bcs
-      common::ArrayView<const la_index_t> mdofs0(macro_dofs[0][0]);
-      common::ArrayView<const la_index_t> mdofs1(macro_dofs[0][1]);
+      common::ArrayView<const PetscInt> mdofs0(macro_dofs[0][0]);
+      common::ArrayView<const PetscInt> mdofs1(macro_dofs[0][1]);
       apply_bc(ufc[0]->macro_A.data(), ufc[1]->macro_A.data(), boundary_values,
                mdofs0, mdofs1);
 
       // Add entries to global tensor
       if (b)
       {
-        std::vector<common::ArrayView<const la_index_t>> mdofs(
+        std::vector<common::ArrayView<const PetscInt>> mdofs(
             macro_dofs[1].size());
         for (std::size_t i = 0; i < macro_dofs[1].size(); ++i)
           mdofs[i].set(macro_dofs[1][i]);
@@ -749,7 +744,7 @@ void SystemAssembler::facet_wise_assembly(
           = ufc[0]->dolfin_form.integrals().num_interior_facet_integrals() > 0;
       if (A && add_macro_element)
       {
-        std::vector<common::ArrayView<const la_index_t>> mdofs(
+        std::vector<common::ArrayView<const PetscInt>> mdofs(
             macro_dofs[0].size());
         for (std::size_t i = 0; i < macro_dofs[0].size(); ++i)
           mdofs[i].set(macro_dofs[0][i]);
@@ -859,13 +854,13 @@ void SystemAssembler::facet_wise_assembly(
 }
 //-----------------------------------------------------------------------------
 void SystemAssembler::compute_exterior_facet_tensor(
-    std::array<std::vector<double>, 2>& Ae, std::array<UFC*, 2>& ufc,
+    std::array<std::vector<PetscScalar>, 2>& Ae, std::array<UFC*, 2>& ufc,
     EigenRowArrayXXd& coordinate_dofs,
     const std::array<bool, 2>& tensor_required_cell,
     const std::array<bool, 2>& tensor_required_facet, const mesh::Cell& cell,
     const mesh::Facet& facet,
-    const std::array<const ufc::cell_integral*, 2>& cell_integrals,
-    const std::array<const ufc::exterior_facet_integral*, 2>&
+    const std::array<const ufc_cell_integral*, 2>& cell_integrals,
+    const std::array<const ufc_exterior_facet_integral*, 2>&
         exterior_facet_integrals,
     const bool compute_cell_tensor)
 {
@@ -888,7 +883,7 @@ void SystemAssembler::compute_exterior_facet_tensor(
     {
       // Update UFC object
       ufc[form]->update(cell, coordinate_dofs,
-                        exterior_facet_integrals[form]->enabled_coefficients());
+                        exterior_facet_integrals[form]->enabled_coefficients);
       exterior_facet_integrals[form]->tabulate_tensor(
           ufc[form]->A.data(), ufc[form]->w(), coordinate_dofs.data(),
           local_facet, 1);
@@ -905,7 +900,7 @@ void SystemAssembler::compute_exterior_facet_tensor(
       if (tensor_required_cell[form])
       {
         ufc[form]->update(cell, coordinate_dofs,
-                          cell_integrals[form]->enabled_coefficients());
+                          cell_integrals[form]->enabled_coefficients);
         cell_integrals[form]->tabulate_tensor(
             ufc[form]->A.data(), ufc[form]->w(), coordinate_dofs.data(), 1);
         for (std::size_t i = 0; i < Ae[form].size(); i++)
@@ -921,8 +916,8 @@ void SystemAssembler::compute_interior_facet_tensor(
     const std::array<bool, 2>& tensor_required_facet,
     const std::array<mesh::Cell, 2>& cell,
     const std::array<std::size_t, 2>& local_facet, const bool facet_owner,
-    const std::array<const ufc::cell_integral*, 2>& cell_integrals,
-    const std::array<const ufc::interior_facet_integral*, 2>&
+    const std::array<const ufc_cell_integral*, 2>& cell_integrals,
+    const std::array<const ufc_interior_facet_integral*, 2>&
         interior_facet_integrals,
     const std::array<std::size_t, 2>& matrix_size,
     const std::size_t vector_size,
@@ -938,7 +933,7 @@ void SystemAssembler::compute_interior_facet_tensor(
       // Update to current pair of cells
       ufc[form]->update(cell[0], coordinate_dofs[0], cell[1],
                         coordinate_dofs[1],
-                        interior_facet_integrals[form]->enabled_coefficients());
+                        interior_facet_integrals[form]->enabled_coefficients);
       // Integrate over facet
       interior_facet_integrals[form]->tabulate_tensor(
           ufc[form]->macro_A.data(), ufc[form]->macro_w(),
@@ -955,7 +950,7 @@ void SystemAssembler::compute_interior_facet_tensor(
         if (tensor_required_cell[form] and !cell[c].is_ghost())
         {
           ufc[form]->update(cell[c], coordinate_dofs[c],
-                            cell_integrals[form]->enabled_coefficients());
+                            cell_integrals[form]->enabled_coefficients);
           cell_integrals[form]->tabulate_tensor(ufc[form]->A.data(),
                                                 ufc[form]->w(),
                                                 coordinate_dofs[c].data(), 1);
@@ -986,9 +981,10 @@ void SystemAssembler::compute_interior_facet_tensor(
 }
 //-----------------------------------------------------------------------------
 void SystemAssembler::matrix_block_add(
-    la::PETScMatrix& tensor, std::vector<double>& Ae,
-    std::vector<double>& macro_A, const std::array<bool, 2>& add_local_tensor,
-    const std::array<std::vector<common::ArrayView<const la_index_t>>, 2>&
+    la::PETScMatrix& tensor, std::vector<PetscScalar>& Ae,
+    std::vector<PetscScalar>& macro_A,
+    const std::array<bool, 2>& add_local_tensor,
+    const std::array<std::vector<common::ArrayView<const PetscInt>>, 2>&
         cell_dofs)
 {
   for (std::size_t c = 0; c < 2; ++c)
@@ -1013,18 +1009,20 @@ void SystemAssembler::matrix_block_add(
 }
 //-----------------------------------------------------------------------------
 void SystemAssembler::apply_bc(
-    double* A, double* b, const std::vector<DirichletBC::Map>& boundary_values,
-    const common::ArrayView<const dolfin::la_index_t>& global_dofs0,
-    const common::ArrayView<const dolfin::la_index_t>& global_dofs1)
+    PetscScalar* A, PetscScalar* b,
+    const std::vector<DirichletBC::Map>& boundary_values,
+    const common::ArrayView<const PetscInt>& global_dofs0,
+    const common::ArrayView<const PetscInt>& global_dofs1)
 {
   assert(A);
   assert(b);
 
   // Wrap matrix and vector using Eigen
-  Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+  Eigen::Map<Eigen::Matrix<PetscScalar, Eigen::Dynamic, Eigen::Dynamic,
                            Eigen::RowMajor>>
       _matA(A, global_dofs0.size(), global_dofs1.size());
-  Eigen::Map<Eigen::VectorXd> _b(b, global_dofs0.size());
+  Eigen::Map<Eigen::Matrix<PetscScalar, Eigen::Dynamic, 1>> _b(
+      b, global_dofs0.size());
 
   if (boundary_values.size() == 1)
   {
@@ -1091,7 +1089,7 @@ void SystemAssembler::apply_bc(
 //-----------------------------------------------------------------------------
 bool SystemAssembler::has_bc(
     const DirichletBC::Map& boundary_values,
-    const common::ArrayView<const dolfin::la_index_t>& dofs)
+    const common::ArrayView<const PetscInt>& dofs)
 {
   // Loop over dofs and check if bc is applied
   for (auto dof = dofs.begin(); dof != dofs.end(); ++dof)
@@ -1107,7 +1105,7 @@ bool SystemAssembler::has_bc(
 bool SystemAssembler::cell_matrix_required(
     const la::PETScMatrix* A, const void* integral,
     const std::vector<DirichletBC::Map>& boundary_values,
-    const common::ArrayView<const dolfin::la_index_t>& dofs)
+    const common::ArrayView<const PetscInt>& dofs)
 {
   if (A && integral)
     return true;

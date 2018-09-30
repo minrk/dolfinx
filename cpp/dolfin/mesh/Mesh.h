@@ -7,6 +7,7 @@
 #pragma once
 
 #include "CellType.h"
+#include "CoordinateDofs.h"
 #include "MeshConnectivity.h"
 #include "MeshGeometry.h"
 #include "MeshTopology.h"
@@ -33,6 +34,7 @@ class Function;
 
 namespace mesh
 {
+enum class GhostMode : int;
 class MeshEntity;
 
 /// A _Mesh_ consists of a set of connected and numbered mesh entities.
@@ -64,20 +66,42 @@ class MeshEntity;
 class Mesh : public common::Variable
 {
 public:
-  /// Constructor
+  /// Construct a Mesh from topological and geometric data.
+  ///
+  /// In parallel, geometric points must be arranged in global index order
+  /// across processes, starting from 0 on process 0, and must not be
+  /// duplicated. The points will be redistributed to the processes that need
+  /// them.
+  ///
+  /// Cells should be listed only on the processes they appear on, i.e. mesh
+  /// partitioning should be performed on the topology data before calling the
+  /// Mesh constructor. Ghost cells, if present, must be at the end of the list
+  /// of cells, and the number of ghost cells must be provided.
   ///
   /// @param comm (MPI_Comm)
-  ///
+  ///         MPI Communicator
   /// @param type (CellType::Type)
-  ///
+  ///         Cell type
   /// @param points
-  ///         Array of points
+  ///         Array of geometric points, arranged in global index order
   /// @param cells
-  ///         Array of cells (containing the global 'vertex' indices for each
+  ///         Array of cells (containing the global point indices for each
   ///         cell)
+  /// @param global_cell_indices
+  ///         Array of global cell indices. If not empty, this must be same size
+  ///         as the number of rows in cells. If empty, global cell indices will
+  ///         be constructed, beginning from 0 on process 0.
+  /// @param num_ghost_cells
+  ///         Number of ghost cells on this process (must be at end of list of
+  ///         cells)
+  // FIXME: What about global vertex indices?
+  // FIXME: Be explicit in passing geometry degree/type
   Mesh(MPI_Comm comm, mesh::CellType::Type type,
-       const Eigen::Ref<const EigenRowArrayXXd>& points,
-       const Eigen::Ref<const EigenRowArrayXXi64>& cells);
+       const Eigen::Ref<const EigenRowArrayXXd> points,
+       const Eigen::Ref<const EigenRowArrayXXi64> cells,
+       const std::vector<std::int64_t>& global_cell_indices,
+       const GhostMode ghost_mode,
+       std::uint32_t num_ghost_cells = 0);
 
   /// Copy constructor.
   ///
@@ -238,17 +262,6 @@ public:
   /// vertices.
   void clean();
 
-  /// Order all mesh entities.
-  ///
-  /// See also: UFC documentation (put link here!)
-  void order();
-
-  /// Check if mesh is ordered according to the UFC numbering convention.
-  ///
-  /// @return bool
-  ///         The return values is true iff the mesh is ordered.
-  bool ordered() const;
-
   /// Compute minimum cell size in mesh, measured greatest distance
   /// between any two vertices of a cell.
   ///
@@ -308,13 +321,15 @@ public:
   /// WARNING: the interface may change in future without
   /// deprecation; the method is now intended for internal
   /// library use.
-  std::string ghost_mode() const;
+  mesh::GhostMode get_ghost_mode() const;
+
+  /// Get coordinate dofs for all local cells
+  const CoordinateDofs& coordinate_dofs() const { return _coordinate_dofs; }
+
+  // FIXME: This should be with MeshGeometry
+  std::uint32_t degree() const { return _degree; }
 
 private:
-  // Friends
-  friend class TopologyComputation;
-  friend class MeshPartitioning;
-
   // Cell type
   std::unique_ptr<mesh::CellType> _cell_type;
 
@@ -324,19 +339,24 @@ private:
   // Mesh geometry
   MeshGeometry _geometry;
 
+  // FIXME: This should be in geometry!
+  // Coordinate dofs
+  CoordinateDofs _coordinate_dofs;
+
+  // FXIME: This shouldn't be here
+  // Mesh geometric degree (in Lagrange basis) describing coordinate dofs
+  std::uint32_t _degree;
+
   // Bounding box tree used to compute collisions between the mesh
   // and other objects. The tree is initialized to a zero pointer
   // and is allocated and built when bounding_box_tree() is called.
   mutable std::shared_ptr<geometry::BoundingBoxTree> _tree;
 
-  // True if mesh has been ordered
-  mutable bool _ordered;
-
   // MPI communicator
   dolfin::MPI::Comm _mpi_comm;
 
   // Ghost mode used for partitioning
-  std::string _ghost_mode;
+  GhostMode _ghost_mode;
 };
-}
-}
+} // namespace mesh
+} // namespace dolfin

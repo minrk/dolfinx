@@ -13,12 +13,11 @@ if sys.version_info < (3, 5):
     print("Python 3.5 or higher required, please upgrade.")
     sys.exit(1)
 
-VERSION = "2018.1.0.dev0"
-RESTRICT_REQUIREMENTS = ">=2018.1.0.dev0,<2018.2"
+VERSION = "2018.2.0.dev0"
+RESTRICT_REQUIREMENTS = ">=2018.2.0.dev0,<2018.3"
 
 REQUIREMENTS = [
     "numpy",
-    "pkgconfig",
     "fenics-ffc{}".format(RESTRICT_REQUIREMENTS),
     "fenics-ufl{}".format(RESTRICT_REQUIREMENTS),
     "fenics-dijitso{}".format(RESTRICT_REQUIREMENTS),
@@ -62,9 +61,9 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             if "CI" in os.environ:
-                build_args += ['--', '-j2']
+                build_args += ['--', '-j3']
             elif "CIRCLECI" in os.environ:
-                build_args += ['--', '-j2']
+                build_args += ['--', '-j3']
             else:
                 num_build_threads = max(1, multiprocessing.cpu_count() - 1)
                 build_args += ['--', '-j' + str(num_build_threads)]
@@ -75,7 +74,7 @@ class CMakeBuild(build_ext):
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp, env=env)
 
 
 setup(name='fenics-dolfin',
