@@ -6,7 +6,6 @@
 
 #include <dolfin/function/Function.h>
 #include <dolfin/function/FunctionSpace.h>
-#include <dolfin/geometry/Point.h>
 #include <dolfin/io/HDF5File.h>
 #include <dolfin/io/XDMFFile.h>
 #include <dolfin/la/PETScVector.h>
@@ -207,7 +206,8 @@ void io(py::module& m)
       // Points
       .def("write",
            [](dolfin::io::XDMFFile& instance, py::list points) {
-             auto _points = points.cast<std::vector<dolfin::geometry::Point>>();
+             auto _points
+                 = points.cast<std::vector<dolfin::EigenPointVector>>();
              instance.write(_points);
            },
            py::arg("points"))
@@ -215,7 +215,8 @@ void io(py::module& m)
       .def("write",
            [](dolfin::io::XDMFFile& instance, py::list points,
               std::vector<double>& values) {
-             auto _points = points.cast<std::vector<dolfin::geometry::Point>>();
+             auto _points
+                 = points.cast<std::vector<dolfin::EigenPointVector>>();
              instance.write(_points, values);
            },
            py::arg("points"), py::arg("values"))
