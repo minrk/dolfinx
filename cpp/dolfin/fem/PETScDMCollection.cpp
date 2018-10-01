@@ -332,7 +332,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
                                          map_it.first.size());
     Eigen::Vector3d curr_point;
     curr_point.setZero();
-    curr_point << _x;
+    curr_point.topRows(gdim) = _x;
 
     // Compute which processes' BBoxes contain the fine point
     found_ranks = treec->compute_process_collisions(curr_point);
@@ -379,7 +379,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
     {
       Eigen::Vector3d curr_point;
       curr_point.setZero();
-      curr_point << recv_pts.row(i);
+      curr_point.topRows(gdim) = recv_pts.row(i);
       send_ids[p].push_back(
           treec->compute_first_entity_collision(curr_point, meshc));
     }
@@ -526,7 +526,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
 
     Eigen::Vector3d curr_point;
     curr_point.setZero();
-    curr_point << x.row(i);
+    curr_point.topRows(gdim) = x.row(i);
 
     // Create coarse cell
     mesh::Cell coarse_cell(meshc, static_cast<std::size_t>(id));

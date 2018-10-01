@@ -228,6 +228,7 @@ void ParallelRefinement::create_new_vertices()
 mesh::Mesh ParallelRefinement::build_local() const
 {
   const std::size_t tdim = _mesh.topology().dim();
+  const std::size_t gdim = _mesh.geometry().dim();
   assert(_new_vertex_coordinates.size() % 3 == 0);
   const std::size_t num_vertices = _new_vertex_coordinates.size() / 3;
 
