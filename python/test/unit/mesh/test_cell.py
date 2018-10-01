@@ -8,7 +8,7 @@ import pytest
 import numpy
 
 from dolfin import (UnitCubeMesh, UnitIntervalMesh, UnitSquareMesh,
-                    MPI, Cell, Mesh, CellType, Point, cpp)
+                    MPI, Cell, Mesh, CellType, cpp)
 from dolfin_utils.test import skip_in_parallel, skip_in_release
 
 
@@ -18,8 +18,10 @@ def test_distance_interval():
     mesh = UnitIntervalMesh(MPI.comm_self, 1)
     cell = Cell(mesh, 0)
 
-    assert round(cell.distance(Point(-1.0)._cpp_object) - 1.0, 7) == 0
-    assert round(cell.distance(Point(0.5)._cpp_object) - 0.0, 7) == 0
+    print(cell.distance([-1.0]))
+
+#    assert round(cell.distance([-1.0]) - 1.0, 7) == 0
+#    assert round(cell.distance([0.5]) - 0.0, 7) == 0
 
 
 @skip_in_parallel
@@ -28,9 +30,9 @@ def test_distance_triangle():
     mesh = UnitSquareMesh(MPI.comm_self, 1, 1)
     cell = Cell(mesh, 1)
 
-    assert round(cell.distance(Point(-1.0, -1.0)._cpp_object) - numpy.sqrt(2), 7) == 0
-    assert round(cell.distance(Point(-1.0, 0.5)._cpp_object) - 1, 7) == 0
-    assert round(cell.distance(Point(0.5, 0.5)._cpp_object) - 0.0, 7) == 0
+    assert round(cell.distance([-1.0, -1.0]) - numpy.sqrt(2), 7) == 0
+    assert round(cell.distance([-1.0, 0.5]) - 1, 7) == 0
+    assert round(cell.distance([0.5, 0.5]) - 0.0, 7) == 0
 
 
 @skip_in_parallel
@@ -39,9 +41,9 @@ def test_distance_tetrahedron():
     mesh = UnitCubeMesh(MPI.comm_self, 1, 1, 1)
     cell = Cell(mesh, 5)
 
-    assert round(cell.distance(Point(-1.0, -1.0, -1.0)._cpp_object) - numpy.sqrt(3), 7) == 0
-    assert round(cell.distance(Point(-1.0, 0.5, 0.5)._cpp_object) - 1, 7) == 0
-    assert round(cell.distance(Point(0.5, 0.5, 0.5)._cpp_object) - 0.0, 7) == 0
+    assert round(cell.distance([-1.0, -1.0, -1.0]) - numpy.sqrt(3), 7) == 0
+    assert round(cell.distance([-1.0, 0.5, 0.5]) - 1, 7) == 0
+    assert round(cell.distance([0.5, 0.5, 0.5]) - 0.0, 7) == 0
 
 
 @pytest.mark.xfail
