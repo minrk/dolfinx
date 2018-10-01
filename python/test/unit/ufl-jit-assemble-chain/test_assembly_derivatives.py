@@ -9,7 +9,7 @@
 import pytest
 import math
 from dolfin import (UnitIntervalMesh, SpatialCoordinate, dx, ds, MPI,
-                    RectangleMesh, FacetNormal, Point)
+                    RectangleMesh, FacetNormal)
 from ufl import (elem_pow, elem_op, elem_div, elem_mult, det, tr, cross, inner, diff,
                  outer, div, grad, dot, as_vector, as_matrix, dev, skew, sym,
                  atan, acos, asin, sin, cos, tan, exp, ln, erf,
@@ -147,7 +147,7 @@ def test_div_grad_then_integrate_over_cells_and_boundary():
 
     # Define 2D geometry
     n = 10
-    mesh = RectangleMesh(Point(0.0, 0.0), Point(2.0, 3.0), 2 * n, 3 * n)
+    mesh = RectangleMesh(numpy.array((0.0, 0.0)), numpy.array((2.0, 3.0)), 2 * n, 3 * n)
 
     x, y = SpatialCoordinate(mesh)
     xs = 0.1 + 0.8 * x / 2  # scaled to be within [0.1,0.9]
