@@ -163,8 +163,7 @@ void ParallelRefinement::create_new_vertices()
       // list
       if (owner)
       {
-        const EigenPointVector& midpoint
-            = mesh::Edge(_mesh, local_i).midpoint();
+        const Eigen::Vector3d& midpoint = mesh::Edge(_mesh, local_i).midpoint();
         for (std::size_t j = 0; j < gdim; ++j)
           _new_vertex_coordinates.push_back(midpoint[j]);
         local_edge_to_new_vertex[local_i] = n++;

@@ -62,7 +62,7 @@ public:
   void flush();
 
   /// Write points to file
-  void write(const std::vector<EigenPointVector>& points,
+  void write(const std::vector<Eigen::Vector3d>& points,
              const std::string name);
 
   /// Write simple vector of double to file

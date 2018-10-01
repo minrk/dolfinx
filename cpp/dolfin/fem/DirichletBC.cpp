@@ -767,7 +767,7 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
   if (facet.dim() == 1)
   {
     // Create points
-    EigenPointVector p;
+    Eigen::Vector3d p;
     p << coordinates[0], coordinates[1];
     const Eigen::Vector3d v0
         = mesh::Vertex(facet.mesh(), facet.entities(0)[0]).x();
@@ -775,9 +775,9 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
         = mesh::Vertex(facet.mesh(), facet.entities(0)[1]).x();
 
     // Create vectors
-    const EigenPointVector v01 = v1 - v0;
-    const EigenPointVector vp0 = v0 - p;
-    const EigenPointVector vp1 = v1 - p;
+    const Eigen::Vector3d v01 = v1 - v0;
+    const Eigen::Vector3d vp0 = v0 - p;
+    const Eigen::Vector3d vp1 = v1 - p;
 
     // Check if the length of the sum of the two line segments vp0 and
     // vp1 is equal to the total length of the facet
@@ -791,7 +791,7 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
   else if (facet.dim() == 2)
   {
     // Create points
-    EigenPointVector p;
+    Eigen::Vector3d p;
     p << coordinates[0], coordinates[1], coordinates[2];
     const Eigen::Vector3d v0
         = mesh::Vertex(facet.mesh(), facet.entities(0)[0]).x();
@@ -801,11 +801,11 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
         = mesh::Vertex(facet.mesh(), facet.entities(0)[2]).x();
 
     // Create vectors
-    const EigenPointVector v01 = v1 - v0;
-    const EigenPointVector v02 = v2 - v0;
-    const EigenPointVector vp0 = v0 - p;
-    const EigenPointVector vp1 = v1 - p;
-    const EigenPointVector vp2 = v2 - p;
+    const Eigen::Vector3d v01 = v1 - v0;
+    const Eigen::Vector3d v02 = v2 - v0;
+    const Eigen::Vector3d vp0 = v0 - p;
+    const Eigen::Vector3d vp1 = v1 - p;
+    const Eigen::Vector3d vp2 = v2 - p;
 
     // Check if the sum of the area of the sub triangles is equal to
     // the total area of the facet

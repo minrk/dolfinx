@@ -27,14 +27,14 @@ class BoxMesh
 {
 public:
   /// Create a uniform finite element _Mesh_ over the rectangular
-  /// prism spanned by the two _EigenPointVector_s p0 and p1. The order of the
+  /// prism spanned by the two _Eigen::Vector3d_s p0 and p1. The order of the
   /// two points is not important in terms of minimum and maximum
   /// coordinates.
   ///
   /// @param comm (MPI_Comm)
   ///         MPI communicator
-  /// @param p (std::array<_EigenPointVector_, 2>)
-  ///         EigenPointVectors of box.
+  /// @param p (std::array<_Eigen::Vector3d_, 2>)
+  ///         Eigen::Vector3ds of box.
   /// @param n (std::array<double, 3> )
   ///         Number of cells in each direction.
   /// @param cell_type
@@ -43,12 +43,12 @@ public:
   /// @code{.cpp}
   ///         // Mesh with 8 cells in each direction on the
   ///         // set [-1,2] x [-1,2] x [-1,2].
-  ///         EigenPointVector p0(-1, -1, -1);
-  ///         EigenPointVector p1(2, 2, 2);
+  ///         Eigen::Vector3d p0(-1, -1, -1);
+  ///         Eigen::Vector3d p1(2, 2, 2);
   ///         auto mesh = BoxMesh::create({p0, p1}, {8, 8, 8});
   /// @endcode
   static mesh::Mesh create(MPI_Comm comm,
-                           const std::array<EigenPointVector, 2>& p,
+                           const std::array<Eigen::Vector3d, 2>& p,
                            std::array<std::size_t, 3> n,
                            mesh::CellType::Type cell_type,
                            const mesh::GhostMode ghost_mode);
@@ -56,7 +56,7 @@ public:
 private:
   // Build mesh
   static mesh::Mesh build_tet(MPI_Comm comm,
-                              const std::array<EigenPointVector, 2>& p,
+                              const std::array<Eigen::Vector3d, 2>& p,
                               std::array<std::size_t, 3> n,
                               const mesh::GhostMode ghost_mode);
 

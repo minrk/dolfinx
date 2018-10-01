@@ -280,24 +280,24 @@ public:
   /// Save a cloud of points to file using an associated HDF5 file,
   /// or storing the data inline as XML.
   ///
-  /// @param    points (_std::vector<EigenPointVector>_)
+  /// @param    points (_std::vector<Eigen::Vector3d>_)
   ///         A list of points to save.
   /// @param    encoding (_Encoding_)
   ///         Encoding to use: HDF5 or ASCII
   ///
-  void write(const std::vector<EigenPointVector>& points);
+  void write(const std::vector<Eigen::Vector3d>& points);
 
   /// Save a cloud of points, with scalar values using an associated
   /// HDF5 file, or storing the data inline as XML.
   ///
-  /// @param   points (_std::vector<EigenPointVector>_)
+  /// @param   points (_std::vector<Eigen::Vector3d>_)
   ///         A list of points to save.
   /// @param    values (_std::vector<double>_)
   ///         A list of values at each point.
   /// @param    encoding (_Encoding_)
   ///         Encoding to use: HDF5 or ASCII
   ///
-  void write(const std::vector<EigenPointVector>& points,
+  void write(const std::vector<Eigen::Vector3d>& points,
              const std::vector<double>& values);
 
   /// Read in the first mesh::Mesh in XDMF file
@@ -440,7 +440,7 @@ private:
 
   // Add set of points to XDMF xml_node and write data
   static void add_points(MPI_Comm comm, pugi::xml_node& xml_node, hid_t h5_id,
-                         const std::vector<EigenPointVector>& points);
+                         const std::vector<Eigen::Vector3d>& points);
 
   // Add topology node to xml_node (includes writing data to XML or  HDF5
   // file)

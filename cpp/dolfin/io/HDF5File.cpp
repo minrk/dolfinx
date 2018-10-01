@@ -95,7 +95,7 @@ void HDF5File::flush()
   HDF5Interface::flush_file(_hdf5_file_id);
 }
 //-----------------------------------------------------------------------------
-void HDF5File::write(const std::vector<EigenPointVector>& points,
+void HDF5File::write(const std::vector<Eigen::Vector3d>& points,
                      const std::string dataset_name)
 {
   assert(points.size() > 0);

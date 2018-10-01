@@ -31,7 +31,7 @@ public:
   double area() const;
 
   /// Compute normal to the face
-  EigenPointVector normal() const;
+  Eigen::Vector3d normal() const;
 };
 }
 }

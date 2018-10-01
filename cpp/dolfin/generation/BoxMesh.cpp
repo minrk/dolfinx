@@ -17,7 +17,7 @@ using namespace dolfin::generation;
 
 //-----------------------------------------------------------------------------
 mesh::Mesh BoxMesh::create(MPI_Comm comm,
-                           const std::array<EigenPointVector, 2>& p,
+                           const std::array<Eigen::Vector3d, 2>& p,
                            std::array<std::size_t, 3> n,
                            mesh::CellType::Type cell_type,
                            const mesh::GhostMode ghost_mode)
@@ -34,7 +34,7 @@ mesh::Mesh BoxMesh::create(MPI_Comm comm,
 }
 //-----------------------------------------------------------------------------
 mesh::Mesh BoxMesh::build_tet(MPI_Comm comm,
-                              const std::array<EigenPointVector, 2>& p,
+                              const std::array<Eigen::Vector3d, 2>& p,
                               std::array<std::size_t, 3> n,
                               const mesh::GhostMode ghost_mode)
 {
@@ -51,8 +51,8 @@ mesh::Mesh BoxMesh::build_tet(MPI_Comm comm,
   }
 
   // Extract data
-  const EigenPointVector& p0 = p[0];
-  const EigenPointVector& p1 = p[1];
+  const Eigen::Vector3d& p0 = p[0];
+  const Eigen::Vector3d& p1 = p[1];
   std::size_t nx = n[0];
   std::size_t ny = n[1];
   std::size_t nz = n[2];

@@ -13,7 +13,7 @@ using namespace dolfin;
 using namespace dolfin::mesh;
 
 //-----------------------------------------------------------------------------
-EigenPointVector Facet::normal() const
+Eigen::Vector3d Facet::normal() const
 {
   const std::size_t D = _mesh->topology().dim();
   _mesh->init(D - 1);
@@ -28,15 +28,15 @@ EigenPointVector Facet::normal() const
   return cell.normal(local_facet);
 }
 //-----------------------------------------------------------------------------
-double Facet::squared_distance(const EigenPointVector& point) const
+double Facet::squared_distance(const Eigen::Vector3d& point) const
 {
   if (_dim == 1)
   {
     // Extract vertices
     const MeshGeometry& geometry = _mesh->geometry();
     const std::int32_t* vertices = entities(0);
-    const EigenPointVector a = geometry.x(vertices[0]);
-    const EigenPointVector b = geometry.x(vertices[1]);
+    const Eigen::Vector3d a = geometry.x(vertices[0]);
+    const Eigen::Vector3d b = geometry.x(vertices[1]);
 
     // Compute squared distance
     return IntervalCell::squared_distance(point, a, b);
@@ -46,9 +46,9 @@ double Facet::squared_distance(const EigenPointVector& point) const
     // Extract vertices
     const MeshGeometry& geometry = _mesh->geometry();
     const std::int32_t* vertices = entities(0);
-    const EigenPointVector a = geometry.x(vertices[0]);
-    const EigenPointVector b = geometry.x(vertices[1]);
-    const EigenPointVector c = geometry.x(vertices[2]);
+    const Eigen::Vector3d a = geometry.x(vertices[0]);
+    const Eigen::Vector3d b = geometry.x(vertices[1]);
+    const Eigen::Vector3d c = geometry.x(vertices[2]);
 
     // Compute squared distance
     return TriangleCell::squared_distance(point, a, b, c);

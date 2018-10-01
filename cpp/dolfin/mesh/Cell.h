@@ -145,7 +145,7 @@ public:
   ///         The point.
   /// @return     double
   ///         The squared distance to the point.
-  double squared_distance(const EigenPointVector& point) const
+  double squared_distance(const Eigen::Vector3d& point) const
   {
     return _mesh->type().squared_distance(*this, point);
   }
@@ -156,7 +156,7 @@ public:
   ///         The point.
   /// @return     double
   ///         The distance to the point.
-  double distance(const EigenPointVector& point) const
+  double distance(const Eigen::Vector3d& point) const
   {
     return sqrt(squared_distance(point));
   }
@@ -166,18 +166,18 @@ public:
   /// @param    facet
   ///         Index of facet.
   ///
-  /// @return EigenPointVector
+  /// @return Eigen::Vector3d
   ///         Normal of the facet.
-  EigenPointVector normal(std::size_t facet) const
+  Eigen::Vector3d normal(std::size_t facet) const
   {
     return _mesh->type().normal(*this, facet);
   }
 
   /// Compute normal to cell itself (viewed as embedded in 3D)
   ///
-  /// @return EigenPointVector
+  /// @return Eigen::Vector3d
   ///         Normal of the cell
-  EigenPointVector cell_normal() const
+  Eigen::Vector3d cell_normal() const
   {
     return _mesh->type().cell_normal(*this);
   }

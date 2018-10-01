@@ -56,7 +56,4 @@ using EigenRowMatrixXd
 // double Vectors
 using EigenVectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
-// Vector for Point storage
-using EigenPointVector = Eigen::Vector3d;
-
 } // namespace dolfin

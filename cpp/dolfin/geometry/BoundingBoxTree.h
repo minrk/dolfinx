@@ -41,23 +41,23 @@ public:
   void build(const mesh::Mesh& mesh, std::size_t tdim);
 
   /// Build bounding box tree for point cloud
-  void build(const std::vector<EigenPointVector>& points);
+  void build(const std::vector<Eigen::Vector3d>& points);
 
-  /// Compute all collisions between bounding boxes and _EigenPointVector_
-  std::vector<unsigned int> compute_collisions(const EigenPointVector& point) const;
+  /// Compute all collisions between bounding boxes and _Eigen::Vector3d_
+  std::vector<unsigned int> compute_collisions(const Eigen::Vector3d& point) const;
 
   /// Compute all collisions between bounding boxes and _BoundingBoxTree_
   std::pair<std::vector<unsigned int>, std::vector<unsigned int>>
   compute_collisions(const BoundingBoxTree& tree) const;
 
-  /// Compute all collisions between entities and _EigenPointVector_
+  /// Compute all collisions between entities and _Eigen::Vector3d_
   std::vector<unsigned int>
-  compute_entity_collisions(const EigenPointVector& point, const mesh::Mesh& mesh) const;
+  compute_entity_collisions(const Eigen::Vector3d& point, const mesh::Mesh& mesh) const;
 
-  /// Compute all collisions between processes and _EigenPointVector_
+  /// Compute all collisions between processes and _Eigen::Vector3d_
   /// returning a list of process ranks
   std::vector<unsigned int>
-  compute_process_collisions(const EigenPointVector& point) const;
+  compute_process_collisions(const Eigen::Vector3d& point) const;
 
   /// Compute all collisions between entities and _BoundingBoxTree_
   std::pair<std::vector<unsigned int>, std::vector<unsigned int>>
@@ -65,24 +65,24 @@ public:
                             const mesh::Mesh& mesh_A,
                             const mesh::Mesh& mesh_B) const;
 
-  /// Compute first collision between bounding boxes and _EigenPointVector_
-  unsigned int compute_first_collision(const EigenPointVector& point) const;
+  /// Compute first collision between bounding boxes and _Eigen::Vector3d_
+  unsigned int compute_first_collision(const Eigen::Vector3d& point) const;
 
-  /// Compute first collision between entities and _EigenPointVector_
-  unsigned int compute_first_entity_collision(const EigenPointVector& point,
+  /// Compute first collision between entities and _Eigen::Vector3d_
+  unsigned int compute_first_entity_collision(const Eigen::Vector3d& point,
                                               const mesh::Mesh& mesh) const;
 
-  /// Compute closest entity and distance to _EigenPointVector_
+  /// Compute closest entity and distance to _Eigen::Vector3d_
   std::pair<unsigned int, double>
-  compute_closest_entity(const EigenPointVector& point, const mesh::Mesh& mesh) const;
+  compute_closest_entity(const Eigen::Vector3d& point, const mesh::Mesh& mesh) const;
 
-  /// Compute closest point and distance to _EigenPointVector_
+  /// Compute closest point and distance to _Eigen::Vector3d_
   std::pair<unsigned int, double>
-  compute_closest_point(const EigenPointVector& point) const;
+  compute_closest_point(const Eigen::Vector3d& point) const;
 
   /// Determine if a point collides with a BoundingBox of
   /// the tree
-  bool collides(const EigenPointVector& point) const
+  bool collides(const Eigen::Vector3d& point) const
   {
     return compute_first_collision(point)
            != std::numeric_limits<unsigned int>::max();
@@ -90,7 +90,7 @@ public:
 
   /// Determine if a point collides with an entity of the mesh
   /// (usually a cell)
-  bool collides_entity(const EigenPointVector& point, const mesh::Mesh& mesh) const
+  bool collides_entity(const Eigen::Vector3d& point, const mesh::Mesh& mesh) const
   {
     return compute_first_entity_collision(point, mesh)
            != std::numeric_limits<unsigned int>::max();
@@ -122,7 +122,7 @@ private:
                       const std::vector<unsigned int>::iterator& end);
 
   // Build bounding box tree for points (recursive)
-  unsigned int _build(const std::vector<EigenPointVector>& points,
+  unsigned int _build(const std::vector<Eigen::Vector3d>& points,
                       const std::vector<unsigned int>::iterator& begin,
                       const std::vector<unsigned int>::iterator& end);
 
@@ -133,7 +133,7 @@ private:
 
   // Compute collisions with point (recursive)
   static void _compute_collisions(const BoundingBoxTree& tree,
-                                  const EigenPointVector& point, unsigned int node,
+                                  const Eigen::Vector3d& point, unsigned int node,
                                   std::vector<unsigned int>& entities,
                                   const mesh::Mesh* mesh);
 
@@ -148,24 +148,24 @@ private:
 
   // Compute first collision (recursive)
   static unsigned int _compute_first_collision(const BoundingBoxTree& tree,
-                                               const EigenPointVector& point,
+                                               const Eigen::Vector3d& point,
                                                unsigned int node);
 
   // Compute first entity collision (recursive)
   static unsigned int
   _compute_first_entity_collision(const BoundingBoxTree& tree,
-                                  const EigenPointVector& point, unsigned int node,
+                                  const Eigen::Vector3d& point, unsigned int node,
                                   const mesh::Mesh& mesh);
 
   // Compute closest entity (recursive)
   static void _compute_closest_entity(const BoundingBoxTree& tree,
-                                      const EigenPointVector& point, unsigned int node,
+                                      const Eigen::Vector3d& point, unsigned int node,
                                       const mesh::Mesh& mesh,
                                       unsigned int& closest_entity, double& R2);
 
   // Compute closest point (recursive)
   static void _compute_closest_point(const BoundingBoxTree& tree,
-                                     const EigenPointVector& point, unsigned int node,
+                                     const Eigen::Vector3d& point, unsigned int node,
                                      unsigned int& closest_point, double& R2);
 
   //--- Utility functions ---
@@ -177,7 +177,7 @@ private:
   void compute_bbox_of_entity(double* b, const mesh::MeshEntity& entity) const;
 
   // Sort points along given axis
-  void sort_points(std::size_t axis, const std::vector<EigenPointVector>& points,
+  void sort_points(std::size_t axis, const std::vector<Eigen::Vector3d>& points,
                    const std::vector<unsigned int>::iterator& begin,
                    const std::vector<unsigned int>::iterator& middle,
                    const std::vector<unsigned int>::iterator& end);
@@ -200,7 +200,7 @@ private:
   inline unsigned int num_bboxes() const { return _bboxes.size(); }
 
   // Add bounding box and point coordinates
-  inline unsigned int add_point(const BBox& bbox, const EigenPointVector& point)
+  inline unsigned int add_point(const BBox& bbox, const Eigen::Vector3d& point)
   {
     // Add bounding box
     _bboxes.push_back(bbox);
@@ -252,7 +252,7 @@ private:
 
   // Compute bounding box of points
   void compute_bbox_of_points(double* bbox, std::size_t& axis,
-                              const std::vector<EigenPointVector>& points,
+                              const std::vector<Eigen::Vector3d>& points,
                               const std::vector<unsigned int>::iterator& begin,
                               const std::vector<unsigned int>::iterator& end);
 

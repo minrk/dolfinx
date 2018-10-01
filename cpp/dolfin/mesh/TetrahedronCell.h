@@ -49,17 +49,17 @@ public:
 
   /// Compute squared distance to given point
   double squared_distance(const mesh::Cell& cell,
-                          const EigenPointVector& point) const;
+                          const Eigen::Vector3d& point) const;
 
   /// Compute component i of normal of given facet with respect to
   /// the cell
   double normal(const mesh::Cell& cell, std::size_t facet, std::size_t i) const;
 
   /// Compute normal of given facet with respect to the cell
-  EigenPointVector normal(const mesh::Cell& cell, std::size_t facet) const;
+  Eigen::Vector3d normal(const mesh::Cell& cell, std::size_t facet) const;
 
   /// Compute normal to given cell (viewed as embedded in 4D ...)
-  EigenPointVector cell_normal(const mesh::Cell& cell) const;
+  Eigen::Vector3d cell_normal(const mesh::Cell& cell) const;
 
   /// Compute the area/length of given facet with respect to the cell
   double facet_area(const mesh::Cell& cell, std::size_t facet) const;
@@ -76,11 +76,11 @@ private:
 
   // Check whether point is outside region defined by facet ABC.
   // The fourth vertex is needed to define the orientation.
-  bool point_outside_of_plane(const EigenPointVector& point,
-                              const EigenPointVector& A,
-                              const EigenPointVector& B,
-                              const EigenPointVector& C,
-                              const EigenPointVector& D) const;
+  bool point_outside_of_plane(const Eigen::Vector3d& point,
+                              const Eigen::Vector3d& A,
+                              const Eigen::Vector3d& B,
+                              const Eigen::Vector3d& C,
+                              const Eigen::Vector3d& D) const;
 };
 }
 }

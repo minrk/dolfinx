@@ -1096,7 +1096,7 @@ XDMFFile::read_mesh_value_collection(std::shared_ptr<const mesh::Mesh> mesh,
   return mvc;
 }
 //-----------------------------------------------------------------------------
-void XDMFFile::write(const std::vector<EigenPointVector>& points)
+void XDMFFile::write(const std::vector<Eigen::Vector3d>& points)
 {
   // Check that encoding
   if (_encoding == Encoding::HDF5 and !has_hdf5())
@@ -1143,7 +1143,7 @@ void XDMFFile::write(const std::vector<EigenPointVector>& points)
 }
 //-----------------------------------------------------------------------------
 void XDMFFile::add_points(MPI_Comm comm, pugi::xml_node& xdmf_node, hid_t h5_id,
-                          const std::vector<EigenPointVector>& points)
+                          const std::vector<Eigen::Vector3d>& points)
 {
   xdmf_node.append_attribute("Version") = "3.0";
   xdmf_node.append_attribute("xmlns:xi") = "http://www.w3.org/2001/XInclude";
@@ -1179,7 +1179,7 @@ void XDMFFile::add_points(MPI_Comm comm, pugi::xml_node& xdmf_node, hid_t h5_id,
   add_data_item(comm, geometry_node, h5_id, "/Points/coordinates", x, shape);
 }
 //----------------------------------------------------------------------------
-void XDMFFile::write(const std::vector<EigenPointVector>& points,
+void XDMFFile::write(const std::vector<Eigen::Vector3d>& points,
                      const std::vector<double>& values)
 {
   // Write clouds of points to XDMF/HDF5 with values

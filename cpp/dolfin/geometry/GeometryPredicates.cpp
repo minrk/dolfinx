@@ -16,7 +16,7 @@ using namespace dolfin::geometry;
 
 //-----------------------------------------------------------------------------
 bool GeometryPredicates::is_degenerate(
-    const std::vector<EigenPointVector>& simplex, std::size_t gdim)
+    const std::vector<Eigen::Vector3d>& simplex, std::size_t gdim)
 {
   switch (gdim)
   {
@@ -33,7 +33,7 @@ bool GeometryPredicates::is_degenerate(
 }
 //-----------------------------------------------------------------------------
 bool GeometryPredicates::is_degenerate_2d(
-    const std::vector<EigenPointVector>& simplex)
+    const std::vector<Eigen::Vector3d>& simplex)
 {
   if (simplex.size() < 2 or simplex.size() > 3)
   {
@@ -59,7 +59,7 @@ bool GeometryPredicates::is_degenerate_2d(
 }
 //------------------------------------------------------------------------------
 bool GeometryPredicates::is_degenerate_3d(
-    const std::vector<EigenPointVector>& simplex)
+    const std::vector<Eigen::Vector3d>& simplex)
 {
   if (simplex.size() < 2 or simplex.size() > 4)
   {
@@ -106,7 +106,7 @@ bool GeometryPredicates::is_degenerate_3d(
   return true;
 }
 //-----------------------------------------------------------------------------
-bool GeometryPredicates::is_finite(const std::vector<EigenPointVector>& simplex)
+bool GeometryPredicates::is_finite(const std::vector<Eigen::Vector3d>& simplex)
 {
   for (auto p : simplex)
   {
@@ -131,9 +131,9 @@ bool GeometryPredicates::is_finite(const std::vector<double>& simplex)
 }
 //-----------------------------------------------------------------------------
 bool GeometryPredicates::convex_hull_is_degenerate(
-    const std::vector<EigenPointVector>& points, std::size_t gdim)
+    const std::vector<Eigen::Vector3d>& points, std::size_t gdim)
 {
-  // EigenPointVectors are assumed to be unique
+  // Eigen::Vector3ds are assumed to be unique
 
   if (points.size() < gdim + 1)
     return true;
@@ -155,8 +155,8 @@ bool GeometryPredicates::convex_hull_is_degenerate(
       {
         for (k = j + 1; k < points.size(); k++)
         {
-          const EigenPointVector ij = points[j] - points[i];
-          const EigenPointVector ik = points[k] - points[i];
+          const Eigen::Vector3d ij = points[j] - points[i];
+          const Eigen::Vector3d ik = points[k] - points[i];
           if (-(std::abs((ij / ij.norm()).dot(ik / ik.norm())) - 1)
               > DOLFIN_EPS)
           {

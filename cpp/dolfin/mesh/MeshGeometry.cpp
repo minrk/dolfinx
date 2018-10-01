@@ -17,10 +17,8 @@ MeshGeometry::MeshGeometry(const Eigen::Ref<const EigenRowArrayXXd>& points)
     : _gdim(points.cols())
 {
   _coordinates.resize(points.rows(), 3);
-  _coordinates.setZero();
-  for (unsigned int i = 0; i < points.rows(); ++i)
-    for (unsigned int j = 0; j < points.cols(); ++j)
-      _coordinates(i, j) = points(i, j);
+  _coordinates.leftCols(_gdim) = points;
+  _coordinates.rightCols(3 - _gdim) = 0;
 }
 //-----------------------------------------------------------------------------
 std::size_t MeshGeometry::hash() const

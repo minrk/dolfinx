@@ -13,9 +13,9 @@ using namespace dolfin;
 using namespace dolfin::geometry;
 
 /// Compute numerically stable cross product (a - c) x (b - c)
-static inline EigenPointVector cross_product(const EigenPointVector& a,
-                                             const EigenPointVector& b,
-                                             const EigenPointVector& c)
+static inline Eigen::Vector3d cross_product(const Eigen::Vector3d& a,
+                                            const Eigen::Vector3d& b,
+                                            const Eigen::Vector3d& c)
 {
   // See Shewchuk Lecture Notes on Geometric Robustness
   double ayz[2] = {a[1], a[2]};
@@ -27,15 +27,15 @@ static inline EigenPointVector cross_product(const EigenPointVector& a,
   double axy[2] = {a[0], a[1]};
   double bxy[2] = {b[0], b[1]};
   double cxy[2] = {c[0], c[1]};
-  return EigenPointVector(_orient2d(ayz, byz, cyz), _orient2d(azx, bzx, czx),
-                          _orient2d(axy, bxy, cxy));
+  return Eigen::Vector3d(_orient2d(ayz, byz, cyz), _orient2d(azx, bzx, czx),
+                         _orient2d(axy, bxy, cxy));
 }
 
 //-----------------------------------------------------------------------------
 // High-level collision detection predicates
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides(const mesh::MeshEntity& entity,
-                                   const EigenPointVector& point)
+                                   const Eigen::Vector3d& point)
 {
   // Intersection is only implemented for simplex meshes
   if (!entity.mesh().type().is_simplex())
@@ -155,9 +155,9 @@ bool CollisionPredicates::collides(const mesh::MeshEntity& entity_0,
 //-----------------------------------------------------------------------------
 // Low-level collision detection predicates
 //-----------------------------------------------------------------------------
-bool CollisionPredicates::collides_segment_point(const EigenPointVector& p0,
-                                                 const EigenPointVector& p1,
-                                                 const EigenPointVector& point,
+bool CollisionPredicates::collides_segment_point(const Eigen::Vector3d& p0,
+                                                 const Eigen::Vector3d& p1,
+                                                 const Eigen::Vector3d& point,
                                                  std::size_t gdim)
 {
   switch (gdim)
@@ -176,10 +176,10 @@ bool CollisionPredicates::collides_segment_point(const EigenPointVector& p0,
   return false;
 }
 //-----------------------------------------------------------------------------
-bool CollisionPredicates::collides_segment_segment(const EigenPointVector& p0,
-                                                   const EigenPointVector& p1,
-                                                   const EigenPointVector& q0,
-                                                   const EigenPointVector& q1,
+bool CollisionPredicates::collides_segment_segment(const Eigen::Vector3d& p0,
+                                                   const Eigen::Vector3d& p1,
+                                                   const Eigen::Vector3d& q0,
+                                                   const Eigen::Vector3d& q1,
                                                    std::size_t gdim)
 {
   switch (gdim)
@@ -198,10 +198,10 @@ bool CollisionPredicates::collides_segment_segment(const EigenPointVector& p0,
   return false;
 }
 //------------------------------------------------------------------------------
-bool CollisionPredicates::collides_triangle_point(const EigenPointVector& p0,
-                                                  const EigenPointVector& p1,
-                                                  const EigenPointVector& p2,
-                                                  const EigenPointVector& point,
+bool CollisionPredicates::collides_triangle_point(const Eigen::Vector3d& p0,
+                                                  const Eigen::Vector3d& p1,
+                                                  const Eigen::Vector3d& p2,
+                                                  const Eigen::Vector3d& point,
                                                   std::size_t gdim)
 {
   switch (gdim)
@@ -218,11 +218,11 @@ bool CollisionPredicates::collides_triangle_point(const EigenPointVector& p0,
   return false;
 }
 //------------------------------------------------------------------------------
-bool CollisionPredicates::collides_triangle_segment(const EigenPointVector& p0,
-                                                    const EigenPointVector& p1,
-                                                    const EigenPointVector& p2,
-                                                    const EigenPointVector& q0,
-                                                    const EigenPointVector& q1,
+bool CollisionPredicates::collides_triangle_segment(const Eigen::Vector3d& p0,
+                                                    const Eigen::Vector3d& p1,
+                                                    const Eigen::Vector3d& p2,
+                                                    const Eigen::Vector3d& q0,
+                                                    const Eigen::Vector3d& q1,
                                                     std::size_t gdim)
 {
   switch (gdim)
@@ -240,9 +240,9 @@ bool CollisionPredicates::collides_triangle_segment(const EigenPointVector& p0,
 }
 //------------------------------------------------------------------------------
 bool CollisionPredicates::collides_triangle_triangle(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& q0,
-    const EigenPointVector& q1, const EigenPointVector& q2, std::size_t gdim)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& q0,
+    const Eigen::Vector3d& q1, const Eigen::Vector3d& q2, std::size_t gdim)
 {
   switch (gdim)
   {
@@ -268,12 +268,12 @@ bool CollisionPredicates::collides_segment_point_1d(double p0, double p1,
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_segment_point_2d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& point)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& point)
 {
   const double orientation = orient2d(p0, p1, point);
 
-  const EigenPointVector dp = p1 - p0;
+  const Eigen::Vector3d dp = p1 - p0;
   const double segment_length = dp.dot(dp);
 
   return orientation == 0.0 && (point - p0).dot(point - p0) <= segment_length
@@ -282,8 +282,8 @@ bool CollisionPredicates::collides_segment_point_2d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_segment_point_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& point)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& point)
 {
 
   if (point == p0 or point == p1)
@@ -306,7 +306,7 @@ bool CollisionPredicates::collides_segment_point_3d(
 
       if (det_yz == 0.0)
       {
-        // EigenPointVector is aligned with segment
+        // Eigen::Vector3d is aligned with segment
         const double length = (p0 - p1).dot(p0 - p1);
         return (point - p0).dot(point - p0) <= length
                and (point - p1).dot(point - p1) <= length;
@@ -331,9 +331,10 @@ bool CollisionPredicates::collides_segment_segment_1d(double p0, double p1,
   return b1 >= a0 - dx && a1 <= b0 + dx;
 }
 //-----------------------------------------------------------------------------
-bool CollisionPredicates::collides_segment_segment_2d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& q0, const EigenPointVector& q1)
+bool CollisionPredicates::collides_segment_segment_2d(const Eigen::Vector3d& p0,
+                                                      const Eigen::Vector3d& p1,
+                                                      const Eigen::Vector3d& q0,
+                                                      const Eigen::Vector3d& q1)
 {
   // FIXME: Optimize by avoiding redundant calls to orient2d
 
@@ -346,7 +347,7 @@ bool CollisionPredicates::collides_segment_segment_2d(
   if (collides_segment_point_2d(q0, q1, p1))
     return true;
 
-  // EigenPointVectors must be on different sides
+  // Eigen::Vector3ds must be on different sides
   if (((orient2d(q0, q1, p0) > 0.0) xor (orient2d(q0, q1, p1) > 0.0))
       and ((orient2d(p0, p1, q0) > 0.0) xor (orient2d(p0, p1, q1) > 0.0)))
     return true;
@@ -354,9 +355,10 @@ bool CollisionPredicates::collides_segment_segment_2d(
     return false;
 }
 //-----------------------------------------------------------------------------
-bool CollisionPredicates::collides_segment_segment_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& q0, const EigenPointVector& q1)
+bool CollisionPredicates::collides_segment_segment_3d(const Eigen::Vector3d& p0,
+                                                      const Eigen::Vector3d& p1,
+                                                      const Eigen::Vector3d& q0,
+                                                      const Eigen::Vector3d& q1)
 {
   // Vertex collisions
   if (p0 == q0 || p0 == q1 || p1 == q0 || p1 == q1)
@@ -380,10 +382,10 @@ bool CollisionPredicates::collides_segment_segment_3d(
   // that they can be parallel, or even collinear.
 
   // Check for collinearity
-  const EigenPointVector u = cross_product(p0, p1, q0);
+  const Eigen::Vector3d u = cross_product(p0, p1, q0);
   if (u[0] == 0.0 and u[1] == 0.0 and u[2] == 0.0)
   {
-    const EigenPointVector v = cross_product(p0, p1, q1);
+    const Eigen::Vector3d v = cross_product(p0, p1, q1);
     if (v[0] == 0.0 and v[1] == 0.0 and v[2] == 0.0)
     {
       // Now we know that the segments are collinear
@@ -414,13 +416,13 @@ bool CollisionPredicates::collides_segment_segment_3d(
     {
       const std::array<std::array<std::size_t, 2>, 3> dims
           = {{{{1, 2}}, {{0, 2}}, {{0, 1}}}};
-      EigenPointVector p0_2d;
+      Eigen::Vector3d p0_2d;
       p0_2d << p0[dims[d][0]], p0[dims[d][1]], 0.0;
-      EigenPointVector p1_2d;
+      Eigen::Vector3d p1_2d;
       p1_2d << p1[dims[d][0]], p1[dims[d][1]], 0.0;
-      EigenPointVector q0_2d;
+      Eigen::Vector3d q0_2d;
       q0_2d << q0[dims[d][0]], q0[dims[d][1]], 0.0;
-      EigenPointVector q1_2d;
+      Eigen::Vector3d q1_2d;
       q1_2d << q1[dims[d][0]], q1[dims[d][1]], 0.0;
 
       return collides_segment_segment_2d(p0_2d, p1_2d, q0_2d, q1_2d);
@@ -431,8 +433,8 @@ bool CollisionPredicates::collides_segment_segment_3d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_triangle_point_2d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& point)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& point)
 {
   const double ref = orient2d(p0, p1, p2);
 
@@ -461,8 +463,8 @@ bool CollisionPredicates::collides_triangle_point_2d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_triangle_point_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& point)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& point)
 {
   if (p0 == point or p1 == point or p2 == point)
     return true;
@@ -473,7 +475,7 @@ bool CollisionPredicates::collides_triangle_point_3d(
     return false;
 
   // Use normal
-  const EigenPointVector n = cross_product(p0, p1, p2);
+  const Eigen::Vector3d n = cross_product(p0, p1, p2);
 
   return !(n.dot(cross_product(point, p0, p1)) < 0.0
            or n.dot(cross_product(point, p2, p0)) < 0.0
@@ -481,9 +483,9 @@ bool CollisionPredicates::collides_triangle_point_3d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_triangle_segment_2d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& q0,
-    const EigenPointVector& q1)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& q0,
+    const Eigen::Vector3d& q1)
 {
   // FIXME: Optimize by avoiding redundant calls to orient2d
 
@@ -504,10 +506,11 @@ bool CollisionPredicates::collides_triangle_segment_2d(
   return false;
 }
 //-----------------------------------------------------------------------------
-bool CollisionPredicates::collides_triangle_segment_3d(
-    const EigenPointVector& r, const EigenPointVector& s,
-    const EigenPointVector& t, const EigenPointVector& a,
-    const EigenPointVector& b)
+bool CollisionPredicates::collides_triangle_segment_3d(const Eigen::Vector3d& r,
+                                                       const Eigen::Vector3d& s,
+                                                       const Eigen::Vector3d& t,
+                                                       const Eigen::Vector3d& a,
+                                                       const Eigen::Vector3d& b)
 {
   // FIXME: Optimize by avoiding redundant calls to orient3d
 
@@ -551,8 +554,8 @@ bool CollisionPredicates::collides_triangle_segment_3d(
   else
   {
     // Temporarily flip a and b to make sure a is above
-    EigenPointVector _a = a;
-    EigenPointVector _b = b;
+    Eigen::Vector3d _a = a;
+    Eigen::Vector3d _b = b;
     if (rsta < 0.0)
       std::swap(_a, _b);
 
@@ -573,15 +576,15 @@ bool CollisionPredicates::collides_triangle_segment_3d(
 }
 //------------------------------------------------------------------------------
 bool CollisionPredicates::collides_triangle_triangle_2d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& q0,
-    const EigenPointVector& q1, const EigenPointVector& q2)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& q0,
+    const Eigen::Vector3d& q1, const Eigen::Vector3d& q2)
 {
   // FIXME: Optimize by avoiding redundant calls to orient2d
 
   // Pack points as vectors
-  const std::array<EigenPointVector, 3> tri_0 = {{p0, p1, p2}};
-  const std::array<EigenPointVector, 3> tri_1 = {{q0, q1, q2}};
+  const std::array<Eigen::Vector3d, 3> tri_0 = {{p0, p1, p2}};
+  const std::array<Eigen::Vector3d, 3> tri_1 = {{q0, q1, q2}};
 
   const bool s0 = std::signbit(orient2d(p0, p1, p2));
   const bool s1 = std::signbit(orient2d(q0, q1, q2));
@@ -613,13 +616,13 @@ bool CollisionPredicates::collides_triangle_triangle_2d(
   for (std::size_t i0 = 0; i0 < 3; i0++)
   {
     const std::size_t j0 = (i0 + 1) % 3;
-    const EigenPointVector& p0 = tri_0[i0];
-    const EigenPointVector& q0 = tri_0[j0];
+    const Eigen::Vector3d& p0 = tri_0[i0];
+    const Eigen::Vector3d& q0 = tri_0[j0];
     for (std::size_t i1 = 0; i1 < 3; i1++)
     {
       const std::size_t j1 = (i1 + 1) % 3;
-      const EigenPointVector& p1 = tri_1[i1];
-      const EigenPointVector& q1 = tri_1[j1];
+      const Eigen::Vector3d& p1 = tri_1[i1];
+      const Eigen::Vector3d& q1 = tri_1[j1];
       if (collides_segment_segment_2d(p0, q0, p1, q1))
         return true;
     }
@@ -629,15 +632,15 @@ bool CollisionPredicates::collides_triangle_triangle_2d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_triangle_triangle_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& q0,
-    const EigenPointVector& q1, const EigenPointVector& q2)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& q0,
+    const Eigen::Vector3d& q1, const Eigen::Vector3d& q2)
 {
   // FIXME: Optimize by avoiding redundant calls to orient3d
 
   // Pack points as vectors
-  const std::array<EigenPointVector, 3> tri_0 = {{p0, p1, p2}};
-  const std::array<EigenPointVector, 3> tri_1 = {{q0, q1, q2}};
+  const std::array<Eigen::Vector3d, 3> tri_0 = {{p0, p1, p2}};
+  const std::array<Eigen::Vector3d, 3> tri_1 = {{q0, q1, q2}};
 
   // First test edge-face collisions
   for (std::size_t i = 0; i < 3; ++i)
@@ -682,9 +685,9 @@ bool CollisionPredicates::collides_triangle_triangle_3d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_tetrahedron_point_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& p3,
-    const EigenPointVector& point)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+    const Eigen::Vector3d& point)
 {
   const double ref = orient3d(p0, p1, p2, p3);
 
@@ -713,9 +716,9 @@ bool CollisionPredicates::collides_tetrahedron_point_3d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_tetrahedron_segment_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& p3,
-    const EigenPointVector& q0, const EigenPointVector& q1)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+    const Eigen::Vector3d& q0, const Eigen::Vector3d& q1)
 {
   // FIXME: Optimize by avoiding redundant calls to orient3d
 
@@ -739,10 +742,10 @@ bool CollisionPredicates::collides_tetrahedron_segment_3d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_tetrahedron_triangle_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& p3,
-    const EigenPointVector& q0, const EigenPointVector& q1,
-    const EigenPointVector& q2)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+    const Eigen::Vector3d& q0, const Eigen::Vector3d& q1,
+    const Eigen::Vector3d& q2)
 {
   // FIXME: Optimize by avoiding redundant calls to orient3d
 
@@ -768,15 +771,15 @@ bool CollisionPredicates::collides_tetrahedron_triangle_3d(
 }
 //-----------------------------------------------------------------------------
 bool CollisionPredicates::collides_tetrahedron_tetrahedron_3d(
-    const EigenPointVector& p0, const EigenPointVector& p1,
-    const EigenPointVector& p2, const EigenPointVector& p3,
-    const EigenPointVector& q0, const EigenPointVector& q1,
-    const EigenPointVector& q2, const EigenPointVector& q3)
+    const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+    const Eigen::Vector3d& q0, const Eigen::Vector3d& q1,
+    const Eigen::Vector3d& q2, const Eigen::Vector3d& q3)
 {
   // FIXME: Optimize by avoiding redundant calls to orient3d
 
-  const std::array<EigenPointVector, 4> tetp = {{p0, p1, p2, p3}};
-  const std::array<EigenPointVector, 4> tetq = {{q0, q1, q2, q3}};
+  const std::array<Eigen::Vector3d, 4> tetp = {{p0, p1, p2, p3}};
+  const std::array<Eigen::Vector3d, 4> tetq = {{q0, q1, q2, q3}};
 
   // Triangle face collisions
   const std::array<std::array<std::size_t, 3>, 4> faces

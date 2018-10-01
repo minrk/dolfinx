@@ -10,150 +10,155 @@ double dolfin::geometry::orient1d(double a, double b, double x)
   return 0.0;
 }
 //-----------------------------------------------------------------------------
-double dolfin::geometry::orient2d(const EigenPointVector& a,
-                                  const EigenPointVector& b,
-                                  const EigenPointVector& c)
+double dolfin::geometry::orient2d(const Eigen::Vector3d& a,
+                                  const Eigen::Vector3d& b,
+                                  const Eigen::Vector3d& c)
 {
   return dolfin::geometry::_orient2d(a.data(), b.data(), c.data());
 }
 //-----------------------------------------------------------------------------
-double dolfin::geometry::orient3d(const EigenPointVector& a,
-                                  const EigenPointVector& b,
-                                  const EigenPointVector& c,
-                                  const EigenPointVector& d)
+double dolfin::geometry::orient3d(const Eigen::Vector3d& a,
+                                  const Eigen::Vector3d& b,
+                                  const Eigen::Vector3d& c,
+                                  const Eigen::Vector3d& d)
 {
   return dolfin::geometry::_orient3d(a.data(), b.data(), c.data(), d.data());
 }
-//-----------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------
 
-/*****************************************************************************/
-/*                                                                           */
-/*  Routines for Arbitrary Precision Floating-point Arithmetic               */
-/*  and Fast Robust Geometric Predicates                                     */
-/*  (predicates.c)                                                           */
-/*                                                                           */
-/*  May 18, 1996                                                             */
-/*                                                                           */
-/*  Placed in the public domain by                                           */
-/*  Jonathan Richard Shewchuk                                                */
-/*  School of Computer Science                                               */
-/*  Carnegie Mellon University                                               */
-/*  5000 Forbes Avenue                                                       */
-/*  Pittsburgh, Pennsylvania  15213-3891                                     */
-/*  jrs@cs.cmu.edu                                                           */
-/*                                                                           */
-/*  This file contains C implementation of algorithms for exact addition     */
-/*    and multiplication of floating-point numbers, and predicates for       */
-/*    robustly performing the orientation and incircle tests used in         */
-/*    computational geometry.  The algorithms and underlying theory are      */
-/*    described in Jonathan Richard Shewchuk.  "Adaptive Precision Floating- */
-/*    Point Arithmetic and Fast Robust Geometric Predicates."  Technical     */
-/*    Report CMU-CS-96-140, School of Computer Science, Carnegie Mellon      */
-/*    University, Pittsburgh, Pennsylvania, May 1996.  (Submitted to         */
-/*    Discrete & Computational Geometry.)                                    */
-/*                                                                           */
-/*  This file, the paper listed above, and other information are available   */
-/*    from the Web page http://www.cs.cmu.edu/~quake/robust.html .           */
-/*                                                                           */
-/*****************************************************************************/
+  /*****************************************************************************/
+  /*                                                                           */
+  /*  Routines for Arbitrary Precision Floating-point Arithmetic */
+  /*  and Fast Robust Geometric Predicates */
+  /*  (predicates.c) */
+  /*                                                                           */
+  /*  May 18, 1996 */
+  /*                                                                           */
+  /*  Placed in the public domain by */
+  /*  Jonathan Richard Shewchuk */
+  /*  School of Computer Science */
+  /*  Carnegie Mellon University */
+  /*  5000 Forbes Avenue */
+  /*  Pittsburgh, Pennsylvania  15213-3891 */
+  /*  jrs@cs.cmu.edu */
+  /*                                                                           */
+  /*  This file contains C implementation of algorithms for exact addition */
+  /*    and multiplication of floating-point numbers, and predicates for */
+  /*    robustly performing the orientation and incircle tests used in */
+  /*    computational geometry.  The algorithms and underlying theory are */
+  /*    described in Jonathan Richard Shewchuk.  "Adaptive Precision Floating-
+   */
+  /*    Point Arithmetic and Fast Robust Geometric Predicates."  Technical */
+  /*    Report CMU-CS-96-140, School of Computer Science, Carnegie Mellon */
+  /*    University, Pittsburgh, Pennsylvania, May 1996.  (Submitted to */
+  /*    Discrete & Computational Geometry.) */
+  /*                                                                           */
+  /*  This file, the paper listed above, and other information are available */
+  /*    from the Web page http://www.cs.cmu.edu/~quake/robust.html . */
+  /*                                                                           */
+  /*****************************************************************************/
 
-/*****************************************************************************/
-/*                                                                           */
-/*  Using this code:                                                         */
-/*                                                                           */
-/*  First, read the short or long version of the paper (from the Web page    */
-/*    above).                                                                */
-/*                                                                           */
-/*  Be sure to call exactinit() once, before calling any of the arithmetic   */
-/*    functions or geometric predicates.  Also be sure to turn on the        */
-/*    optimizer when compiling this file.                                    */
-/*                                                                           */
-/*                                                                           */
-/*  Several geometric predicates are defined.  Their parameters are all      */
-/*    points.  Each point is an array of two or three floating-point         */
-/*    numbers.  The geometric predicates, described in the papers, are       */
-/*                                                                           */
-/*    orient2d(pa, pb, pc)                                                   */
-/*    orient2dfast(pa, pb, pc)                                               */
-/*    orient3d(pa, pb, pc, pd)                                               */
-/*    orient3dfast(pa, pb, pc, pd)                                           */
-/*    incircle(pa, pb, pc, pd)                                               */
-/*    incirclefast(pa, pb, pc, pd)                                           */
-/*    insphere(pa, pb, pc, pd, pe)                                           */
-/*    inspherefast(pa, pb, pc, pd, pe)                                       */
-/*                                                                           */
-/*  Those with suffix "fast" are approximate, non-robust versions.  Those    */
-/*    without the suffix are adaptive precision, robust versions.  There     */
-/*    are also versions with the suffices "exact" and "slow", which are      */
-/*    non-adaptive, exact arithmetic versions, which I use only for timings  */
-/*    in my arithmetic papers.                                               */
-/*                                                                           */
-/*                                                                           */
-/*  An expansion is represented by an array of floating-point numbers,       */
-/*    sorted from smallest to largest magnitude (possibly with interspersed  */
-/*    zeros).  The length of each expansion is stored as a separate integer, */
-/*    and each arithmetic function returns an integer which is the length    */
-/*    of the expansion it created.                                           */
-/*                                                                           */
-/*  Several arithmetic functions are defined.  Their parameters are          */
-/*                                                                           */
-/*    e, f           Input expansions                                        */
-/*    elen, flen     Lengths of input expansions (must be >= 1)              */
-/*    h              Output expansion                                        */
-/*    b              Input scalar                                            */
-/*                                                                           */
-/*  The arithmetic functions are                                             */
-/*                                                                           */
-/*    grow_expansion(elen, e, b, h)                                          */
-/*    grow_expansion_zeroelim(elen, e, b, h)                                 */
-/*    expansion_sum(elen, e, flen, f, h)                                     */
-/*    expansion_sum_zeroelim1(elen, e, flen, f, h)                           */
-/*    expansion_sum_zeroelim2(elen, e, flen, f, h)                           */
-/*    fast_expansion_sum(elen, e, flen, f, h)                                */
-/*    fast_expansion_sum_zeroelim(elen, e, flen, f, h)                       */
-/*    linear_expansion_sum(elen, e, flen, f, h)                              */
-/*    linear_expansion_sum_zeroelim(elen, e, flen, f, h)                     */
-/*    scale_expansion(elen, e, b, h)                                         */
-/*    scale_expansion_zeroelim(elen, e, b, h)                                */
-/*    compress(elen, e, h)                                                   */
-/*                                                                           */
-/*  All of these are described in the long version of the paper; some are    */
-/*    described in the short version.  All return an integer that is the     */
-/*    length of h.  Those with suffix _zeroelim perform zero elimination,    */
-/*    and are recommended over their counterparts.  The procedure            */
-/*    fast_expansion_sum_zeroelim() (or linear_expansion_sum_zeroelim() on   */
-/*    processors that do not use the round-to-even tiebreaking rule) is      */
-/*    recommended over expansion_sum_zeroelim().  Each procedure has a       */
-/*    little note next to it (in the code below) that tells you whether or   */
-/*    not the output expansion may be the same array as one of the input     */
-/*    expansions.                                                            */
-/*                                                                           */
-/*                                                                           */
-/*  If you look around below, you'll also find macros for a bunch of         */
-/*    simple unrolled arithmetic operations, and procedures for printing     */
-/*    expansions (commented out because they don't work with all C           */
-/*    compilers) and for generating random floating-point numbers whose      */
-/*    significand bits are all random.  Most of the macros have undocumented */
-/*    requirements that certain of their parameters should not be the same   */
-/*    variable; for safety, better to make sure all the parameters are       */
-/*    distinct variables.  Feel free to send email to jrs@cs.cmu.edu if you  */
-/*    have questions.                                                        */
-/*                                                                           */
-/*****************************************************************************/
+  /*****************************************************************************/
+  /*                                                                           */
+  /*  Using this code: */
+  /*                                                                           */
+  /*  First, read the short or long version of the paper (from the Web page */
+  /*    above). */
+  /*                                                                           */
+  /*  Be sure to call exactinit() once, before calling any of the arithmetic */
+  /*    functions or geometric predicates.  Also be sure to turn on the */
+  /*    optimizer when compiling this file. */
+  /*                                                                           */
+  /*                                                                           */
+  /*  Several geometric predicates are defined.  Their parameters are all */
+  /*    points.  Each point is an array of two or three floating-point */
+  /*    numbers.  The geometric predicates, described in the papers, are */
+  /*                                                                           */
+  /*    orient2d(pa, pb, pc) */
+  /*    orient2dfast(pa, pb, pc) */
+  /*    orient3d(pa, pb, pc, pd) */
+  /*    orient3dfast(pa, pb, pc, pd) */
+  /*    incircle(pa, pb, pc, pd) */
+  /*    incirclefast(pa, pb, pc, pd) */
+  /*    insphere(pa, pb, pc, pd, pe) */
+  /*    inspherefast(pa, pb, pc, pd, pe) */
+  /*                                                                           */
+  /*  Those with suffix "fast" are approximate, non-robust versions.  Those */
+  /*    without the suffix are adaptive precision, robust versions.  There */
+  /*    are also versions with the suffices "exact" and "slow", which are */
+  /*    non-adaptive, exact arithmetic versions, which I use only for timings */
+  /*    in my arithmetic papers. */
+  /*                                                                           */
+  /*                                                                           */
+  /*  An expansion is represented by an array of floating-point numbers, */
+  /*    sorted from smallest to largest magnitude (possibly with interspersed */
+  /*    zeros).  The length of each expansion is stored as a separate integer,
+   */
+  /*    and each arithmetic function returns an integer which is the length */
+  /*    of the expansion it created. */
+  /*                                                                           */
+  /*  Several arithmetic functions are defined.  Their parameters are */
+  /*                                                                           */
+  /*    e, f           Input expansions */
+  /*    elen, flen     Lengths of input expansions (must be >= 1) */
+  /*    h              Output expansion */
+  /*    b              Input scalar */
+  /*                                                                           */
+  /*  The arithmetic functions are */
+  /*                                                                           */
+  /*    grow_expansion(elen, e, b, h) */
+  /*    grow_expansion_zeroelim(elen, e, b, h) */
+  /*    expansion_sum(elen, e, flen, f, h) */
+  /*    expansion_sum_zeroelim1(elen, e, flen, f, h) */
+  /*    expansion_sum_zeroelim2(elen, e, flen, f, h) */
+  /*    fast_expansion_sum(elen, e, flen, f, h) */
+  /*    fast_expansion_sum_zeroelim(elen, e, flen, f, h) */
+  /*    linear_expansion_sum(elen, e, flen, f, h) */
+  /*    linear_expansion_sum_zeroelim(elen, e, flen, f, h) */
+  /*    scale_expansion(elen, e, b, h) */
+  /*    scale_expansion_zeroelim(elen, e, b, h) */
+  /*    compress(elen, e, h) */
+  /*                                                                           */
+  /*  All of these are described in the long version of the paper; some are */
+  /*    described in the short version.  All return an integer that is the */
+  /*    length of h.  Those with suffix _zeroelim perform zero elimination, */
+  /*    and are recommended over their counterparts.  The procedure */
+  /*    fast_expansion_sum_zeroelim() (or linear_expansion_sum_zeroelim() on */
+  /*    processors that do not use the round-to-even tiebreaking rule) is */
+  /*    recommended over expansion_sum_zeroelim().  Each procedure has a */
+  /*    little note next to it (in the code below) that tells you whether or */
+  /*    not the output expansion may be the same array as one of the input */
+  /*    expansions. */
+  /*                                                                           */
+  /*                                                                           */
+  /*  If you look around below, you'll also find macros for a bunch of */
+  /*    simple unrolled arithmetic operations, and procedures for printing */
+  /*    expansions (commented out because they don't work with all C */
+  /*    compilers) and for generating random floating-point numbers whose */
+  /*    significand bits are all random.  Most of the macros have undocumented
+   */
+  /*    requirements that certain of their parameters should not be the same */
+  /*    variable; for safety, better to make sure all the parameters are */
+  /*    distinct variables.  Feel free to send email to jrs@cs.cmu.edu if you */
+  /*    have questions. */
+  /*                                                                           */
+  /*****************************************************************************/
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
-/* On some machines, the exact arithmetic routines might be defeated by the  */
-/*   use of internal extended precision floating-point registers.  Sometimes */
-/*   this problem can be fixed by defining certain values to be volatile,    */
-/*   thus forcing them to be stored to memory and rounded off.  This isn't   */
-/*   a great solution, though, as it slows the arithmetic down.              */
-/*                                                                           */
-/* To try this out, write "#define INEXACT volatile" below.  Normally,       */
-/*   however, INEXACT should be defined to be nothing.  ("#define INEXACT".) */
+  /* On some machines, the exact arithmetic routines might be defeated by the */
+  /*   use of internal extended precision floating-point registers.  Sometimes
+   */
+  /*   this problem can be fixed by defining certain values to be volatile, */
+  /*   thus forcing them to be stored to memory and rounded off.  This isn't */
+  /*   a great solution, though, as it slows the arithmetic down. */
+  /*                                                                           */
+  /* To try this out, write "#define INEXACT volatile" below.  Normally, */
+  /*   however, INEXACT should be defined to be nothing.  ("#define INEXACT".)
+   */
 
 #define INEXACT /* Nothing */
 /* #define INEXACT volatile */
@@ -163,27 +168,28 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
 #define NARROWRAND narrowdoublerand
 #define UNIFORMRAND uniformdoublerand
 
-/* Which of the following two methods of finding the absolute values is      */
-/*   fastest is compiler-dependent.  A few compilers can inline and optimize */
-/*   the fabs() call; but most will incur the overhead of a function call,   */
-/*   which is disastrously slow.  A faster way on IEEE machines might be to  */
-/*   mask the appropriate bit, but that's difficult to do in C.              */
+  /* Which of the following two methods of finding the absolute values is */
+  /*   fastest is compiler-dependent.  A few compilers can inline and optimize
+   */
+  /*   the fabs() call; but most will incur the overhead of a function call, */
+  /*   which is disastrously slow.  A faster way on IEEE machines might be to */
+  /*   mask the appropriate bit, but that's difficult to do in C. */
 
 #define Absolute(a) ((a) >= 0.0 ? (a) : -(a))
-/* #define Absolute(a)  fabs(a) */
+  /* #define Absolute(a)  fabs(a) */
 
-/* Many of the operations are broken up into two pieces, a main part that    */
-/*   performs an approximate operation, and a "tail" that computes the       */
-/*   roundoff error of that operation.                                       */
-/*                                                                           */
-/* The operations Fast_Two_Sum(), Fast_Two_Diff(), Two_Sum(), Two_Diff(),    */
-/*   Split(), and Two_Product() are all implemented as described in the      */
-/*   reference.  Each of these macros requires certain variables to be       */
-/*   defined in the calling routine.  The variables `bvirt', `c', `abig',    */
-/*   `_i', `_j', `_k', `_l', `_m', and `_n' are declared `INEXACT' because   */
-/*   they store the result of an operation that may incur roundoff error.    */
-/*   The input parameter `x' (or the highest numbered `x_' parameter) must   */
-/*   also be declared `INEXACT'.                                             */
+  /* Many of the operations are broken up into two pieces, a main part that */
+  /*   performs an approximate operation, and a "tail" that computes the */
+  /*   roundoff error of that operation. */
+  /*                                                                           */
+  /* The operations Fast_Two_Sum(), Fast_Two_Diff(), Two_Sum(), Two_Diff(), */
+  /*   Split(), and Two_Product() are all implemented as described in the */
+  /*   reference.  Each of these macros requires certain variables to be */
+  /*   defined in the calling routine.  The variables `bvirt', `c', `abig', */
+  /*   `_i', `_j', `_k', `_l', `_m', and `_n' are declared `INEXACT' because */
+  /*   they store the result of an operation that may incur roundoff error. */
+  /*   The input parameter `x' (or the highest numbered `x_' parameter) must */
+  /*   also be declared `INEXACT'. */
 
 #define Fast_Two_Sum_Tail(a, b, x, y)                                          \
   bvirt = x - a;                                                               \
@@ -241,8 +247,8 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
   x = (REAL)(a * b);                                                           \
   Two_Product_Tail(a, b, x, y)
 
-/* Two_Product_Presplit() is Two_Product() where one of the inputs has       */
-/*   already been split.  Avoids redundant splitting.                        */
+  /* Two_Product_Presplit() is Two_Product() where one of the inputs has */
+  /*   already been split.  Avoids redundant splitting. */
 
 #define Two_Product_Presplit(a, b, bhi, blo, x, y)                             \
   x = (REAL)(a * b);                                                           \
@@ -252,8 +258,8 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
   err3 = err2 - (ahi * blo);                                                   \
   y = (alo * blo) - err3
 
-/* Two_Product_2Presplit() is Two_Product() where both of the inputs have    */
-/*   already been split.  Avoids redundant splitting.                        */
+  /* Two_Product_2Presplit() is Two_Product() where both of the inputs have */
+  /*   already been split.  Avoids redundant splitting. */
 
 #define Two_Product_2Presplit(a, ahi, alo, b, bhi, blo, x, y)                  \
   x = (REAL)(a * b);                                                           \
@@ -262,7 +268,7 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
   err3 = err2 - (ahi * blo);                                                   \
   y = (alo * blo) - err3
 
-/* Square() can be done more quickly than Two_Product().                     */
+  /* Square() can be done more quickly than Two_Product(). */
 
 #define Square_Tail(a, x, y)                                                   \
   Split(a, ahi, alo);                                                          \
@@ -274,8 +280,8 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
   x = (REAL)(a * a);                                                           \
   Square_Tail(a, x, y)
 
-/* Macros for summing expansions of various fixed lengths.  These are all    */
-/*   unrolled versions of Expansion_Sum().                                   */
+  /* Macros for summing expansions of various fixed lengths.  These are all */
+  /*   unrolled versions of Expansion_Sum(). */
 
 #define Two_One_Sum(a1, a0, b, x2, x1, x0)                                     \
   Two_Sum(a0, b, _i, x0);                                                      \
@@ -325,7 +331,7 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
   Eight_Two_Sum(_l, _6, _5, _4, _3, _2, _1, _0, b4, b3, x11, x10, x9, x8, x7,  \
                 x6, x5, x4, x3, x2)
 
-/* Macros for multiplying expansions of various fixed lengths.               */
+  /* Macros for multiplying expansions of various fixed lengths. */
 
 #define Two_One_Product(a1, a0, b, x3, x2, x1, x0)                             \
   Split(b, bhi, blo);                                                          \
@@ -373,9 +379,9 @@ double dolfin::geometry::orient3d(const EigenPointVector& a,
   Two_Sum(_2, _i, _k, x5);                                                     \
   Two_Sum(_m, _k, x7, x6)
 
-/* An expansion of length two can be squared more quickly than finding the   */
-/*   product of two different expansions of length two, and the result is    */
-/*   guaranteed to have no more than six (rather than eight) components.     */
+  /* An expansion of length two can be squared more quickly than finding the */
+  /*   product of two different expansions of length two, and the result is */
+  /*   guaranteed to have no more than six (rather than eight) components. */
 
 #define Two_Square(a1, a0, x5, x4, x3, x2, x1, x0)                             \
   Square(a0, _j, x0);                                                          \
@@ -2571,7 +2577,7 @@ double dolfin::geometry::_orient3d(const double* pa, const double* pb,
   return orient3dadapt(pa, pb, pc, pd, permanent);
 }
 
-//--- DOLFIN-specific additions ---
+  //--- DOLFIN-specific additions ---
 
 #include "predicates.h"
 

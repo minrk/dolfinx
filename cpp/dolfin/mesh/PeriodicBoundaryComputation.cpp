@@ -109,7 +109,7 @@ PeriodicBoundaryComputation::compute_periodic_pairs(const Mesh& mesh,
           visited[e.index()] = true;
 
         // Copy entity coordinate
-        const EigenPointVector midpoint = e.midpoint();
+        const Eigen::Vector3d midpoint = e.midpoint();
         std::copy(midpoint.data(), midpoint.data() + gdim, x.begin());
 
         // Check if entity lies on a 'master' or 'slave' boundary

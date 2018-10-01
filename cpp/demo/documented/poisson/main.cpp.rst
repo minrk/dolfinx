@@ -164,7 +164,7 @@ the form file) defined relative to this mesh, we do as follows
      common::SubSystemsManager::init_petsc(argc, argv);
 
      // Create mesh and function space
-     std::array<EigenPointVector, 2> pt;
+     std::array<Eigen::Vector3d, 2> pt;
      pt[0] << 0.0, 0.0, 0.0;
      pt[1] << 1.0, 1.0, 0.0;
      auto mesh = std::make_shared<mesh::Mesh>(generation::RectangleMesh::create(

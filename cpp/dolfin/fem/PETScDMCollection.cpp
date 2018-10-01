@@ -330,7 +330,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
   {
     Eigen::Map<const Eigen::VectorXd> _x(map_it.first.data(),
                                          map_it.first.size());
-    EigenPointVector curr_point;
+    Eigen::Vector3d curr_point;
     curr_point.setZero();
     curr_point << _x;
 
@@ -377,7 +377,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
         recv_found[p].data(), recv_found[p].size() / gdim, gdim);
     for (unsigned int i = 0; i < recv_pts.rows(); ++i)
     {
-      EigenPointVector curr_point;
+      Eigen::Vector3d curr_point;
       curr_point.setZero();
       curr_point << recv_pts.row(i);
       send_ids[p].push_back(
@@ -524,7 +524,7 @@ std::shared_ptr<la::PETScMatrix> PETScDMCollection::create_transfer_matrix(
     // Get coarse cell id and point
     unsigned int id = found_ids[i];
 
-    EigenPointVector curr_point;
+    Eigen::Vector3d curr_point;
     curr_point.setZero();
     curr_point << x.row(i);
 
@@ -685,9 +685,9 @@ void PETScDMCollection::find_exterior_points(
     Eigen::Map<const EigenRowArrayXXd> pts(p.data(), p.size() / dim, dim);
     for (unsigned int i = 0; i < pts.rows(); ++i)
     {
-      EigenPointVector curr_point;
+      Eigen::Vector3d curr_point;
       curr_point.setZero();
-      curr_point << pts.row(i);
+      curr_point.topRows(pts.cols()) = pts.row(i);
 
       std::pair<unsigned int, double> find_point
           = treec->compute_closest_entity(curr_point, meshc);

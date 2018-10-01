@@ -15,13 +15,13 @@ void exactinit();
 /// Compute relative orientation of point x wrt segment [a, b]
 double orient1d(double a, double b, double x);
 
-/// Convenience function using dolfin::EigenPointVector
-double orient2d(const EigenPointVector& a, const EigenPointVector& b,
-                const EigenPointVector& c);
+/// Convenience function using dolfin::Eigen::Vector3d
+double orient2d(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                const Eigen::Vector3d& c);
 
-/// Convenience function using dolfin::EigenPointVector
-double orient3d(const EigenPointVector& a, const EigenPointVector& b,
-                const EigenPointVector& c, const EigenPointVector& d);
+/// Convenience function using dolfin::Eigen::Vector3d
+double orient3d(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                const Eigen::Vector3d& c, const Eigen::Vector3d& d);
 
 /// Class used for automatic initialization of tolerances at startup.
 /// A global instance is defined inside predicates.cpp to ensure that

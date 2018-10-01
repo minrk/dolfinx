@@ -43,7 +43,7 @@ double Face::area() const
   }
 }
 //-----------------------------------------------------------------------------
-EigenPointVector Face::normal() const
+Eigen::Vector3d Face::normal() const
 {
   assert(_mesh);
 
