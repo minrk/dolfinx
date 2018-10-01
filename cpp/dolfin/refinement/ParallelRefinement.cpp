@@ -138,7 +138,6 @@ void ParallelRefinement::create_new_vertices()
 
   // Tally up unshared marked edges, and shared marked edges which are
   // owned on this process.  Index them sequentially from zero.
-  const std::size_t gdim = _mesh.geometry().dim();
   std::size_t n = 0;
   for (std::int32_t local_i = 0; local_i < _mesh.num_entities(1); ++local_i)
   {
@@ -164,7 +163,7 @@ void ParallelRefinement::create_new_vertices()
       if (owner)
       {
         const Eigen::Vector3d& midpoint = mesh::Edge(_mesh, local_i).midpoint();
-        for (std::size_t j = 0; j < gdim; ++j)
+        for (std::size_t j = 0; j < 3; ++j)
           _new_vertex_coordinates.push_back(midpoint[j]);
         local_edge_to_new_vertex[local_i] = n++;
       }
@@ -218,8 +217,7 @@ void ParallelRefinement::create_new_vertices()
     global_indices.push_back(i + global_offset);
 
   Eigen::Map<EigenRowArrayXXd> old_tmp(_new_vertex_coordinates.data(),
-                                       _new_vertex_coordinates.size() / gdim,
-                                       gdim);
+                                       _new_vertex_coordinates.size() / 3, 3);
   EigenRowArrayXXd tmp = mesh::DistributedMeshTools::reorder_by_global_indices(
       _mesh.mpi_comm(), old_tmp, global_indices);
 
@@ -230,9 +228,8 @@ void ParallelRefinement::create_new_vertices()
 mesh::Mesh ParallelRefinement::build_local() const
 {
   const std::size_t tdim = _mesh.topology().dim();
-  const std::size_t gdim = _mesh.geometry().dim();
-  assert(_new_vertex_coordinates.size() % gdim == 0);
-  const std::size_t num_vertices = _new_vertex_coordinates.size() / gdim;
+  assert(_new_vertex_coordinates.size() % 3 == 0);
+  const std::size_t num_vertices = _new_vertex_coordinates.size() / 3;
 
   const std::size_t num_cell_vertices = tdim + 1;
   assert(new_cell_topology.size() % num_cell_vertices == 0);

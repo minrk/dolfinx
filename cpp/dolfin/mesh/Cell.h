@@ -213,7 +213,7 @@ public:
 
     coordinates.resize(ndofs, gdim);
     for (unsigned int i = 0; i < ndofs; ++i)
-      coordinates.row(i) = x.row(dofs[i]);
+      coordinates.row(i) = x.row(dofs[i]).leftCols(gdim);
   }
 };
 } // namespace mesh

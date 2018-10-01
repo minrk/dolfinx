@@ -1839,17 +1839,21 @@ void XDMFFile::add_geometry_data(MPI_Comm comm, pugi::xml_node& xml_node,
   EigenRowArrayXXd _x = mesh::DistributedMeshTools::reorder_by_global_indices(
       mesh.mpi_comm(), mesh.geometry().points(),
       mesh.geometry().global_indices());
-  std::vector<double> x(_x.data(), _x.data() + _x.size());
 
-  // XDMF does not support 1D, so handle as special case
   if (gdim == 1)
-  {
-    // Pad the coordinates with zeros for a dummy Y
     gdim = 2;
-    std::vector<double> _x(2 * x.size(), 0.0);
-    for (std::size_t i = 0; i < x.size(); ++i)
-      _x[2 * i] = x[i];
-    std::swap(x, _x);
+
+  std::vector<double> x(_x.rows() * gdim);
+
+  if (gdim == 3)
+    std::copy(_x.data(), _x.data() + _x.size(), x.begin());
+  else
+  {
+    for (std::int32_t i = 0; i < _x.rows(); ++i)
+    {
+      x[i * 2] = _x(i, 0);
+      x[i * 2 + 1] = _x(i, 1);
+    }
   }
 
   // Add geometry DataItem node

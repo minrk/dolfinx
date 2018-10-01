@@ -167,7 +167,7 @@ void SubDomain::mark(S& sub_domains, T sub_domain, const Mesh& mesh,
   for (std::int32_t i = 0; i != mesh.num_entities(0); ++i)
   {
     if (boundary_vertex[i] != -1)
-      x_bound.row(boundary_vertex[i]) = x.row(i);
+      x_bound.row(boundary_vertex[i]) = x.row(i).leftCols(gdim);
   }
   EigenArrayXb bound_inside = inside(x_bound, true);
   assert(bound_inside.rows() == x_bound.rows());

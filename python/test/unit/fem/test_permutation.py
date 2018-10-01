@@ -10,7 +10,7 @@
 from dolfin import (Mesh, MPI, CellType, fem, FunctionSpace,
                     FiniteElement, VectorElement, triangle,
                     VectorFunctionSpace, interpolate, Expression,
-                    Function, UnitSquareMesh, UnitCubeMesh, Cells, VertexRange, Point)
+                    Function, UnitSquareMesh, UnitCubeMesh, Cells, VertexRange)
 from dolfin.cpp.mesh import GhostMode
 from dolfin_utils.test import skip_in_parallel
 import numpy
@@ -72,12 +72,11 @@ def test_p4_parallel_2d():
         x[0] = random()
         x[1] = random() * (1 - x[0])
         x[2] = 1 - x[0] - x[1]
-        p = Point(0.0, 0.0)
+        p = numpy.array((0.0, 0.0, 0.0))
         for i, v in enumerate(VertexRange(c)):
-            p += v.point() * x[i]
-        p = p.array()[:2]
+            p += v.x() * x[i]
 
-        assert numpy.isclose(F(p)[0], p[0])
+        assert numpy.isclose(F(p[:2])[0], p[0])
 
 
 def test_p4_parallel_3d():
@@ -95,10 +94,9 @@ def test_p4_parallel_3d():
         x[1] = random() * (1 - x[0])
         x[2] = random() * (1 - x[0] - x[1])
         x[3] = 1 - x[0] - x[1] - x[2]
-        p = Point(0.0, 0.0, 0.0)
+        p = numpy.array((0.0, 0.0, 0.0))
         for i, v in enumerate(VertexRange(c)):
-            p += v.point() * x[i]
-        p = p.array()
+            p += v.x() * x[i]
 
         assert numpy.isclose(F(p)[0], p[0])
 
@@ -119,12 +117,11 @@ def test_mixed_parallel():
         x[0] = random()
         x[1] = random() * (1 - x[0])
         x[2] = (1 - x[0] - x[1])
-        p = Point(0.0, 0.0)
+        p = numpy.array((0.0, 0.0, 0.0))
         for i, v in enumerate(VertexRange(c)):
-            p += v.point() * x[i]
-        p = p.array()[:2]
+            p += v.x() * x[i]
 
-        val = F(p)[0]
+        val = F(p[:2])[0]
 
         assert numpy.isclose(val[0], p[0])
         assert numpy.isclose(val[1], p[1])
