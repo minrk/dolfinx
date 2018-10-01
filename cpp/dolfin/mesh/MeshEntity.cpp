@@ -115,7 +115,7 @@ Eigen::VectorXd MeshEntity::midpoint() const
   y /= double(num_vertices);
   z /= double(num_vertices);
 
-  Eigen::VectorXd p;
+  Eigen::Vector3d p;
   p << x, y, z;
   return p;
 }

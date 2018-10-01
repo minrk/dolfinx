@@ -14,7 +14,7 @@ import FIAT
 from math import sqrt
 from dolfin import (MPI, RectangleMesh, BoxMesh, UnitIntervalMesh,
                     UnitSquareMesh, UnitCubeMesh, CellType, Vertex,
-                     Cell, Cells, MeshFunction,
+                    Cell, Cells, MeshFunction,
                     MeshEntity, MeshEntities, cpp)
 from dolfin.io import XDMFFile
 from dolfin_utils.test import cd_tempdir, fixture, skip_in_parallel  # noqa

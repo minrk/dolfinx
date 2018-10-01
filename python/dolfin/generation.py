@@ -41,7 +41,6 @@ def UnitSquareMesh(comm, nx, ny, cell_type=cpp.mesh.CellType.Type.triangle,
 def UnitCubeMesh(comm, nx, ny, nz, cell_type=cpp.mesh.CellType.Type.tetrahedron,
                  ghost_mode=cpp.mesh.GhostMode.none):
     """Create a mesh of a unit cube"""
-    from dolfin.geometry import Point
     mesh = cpp.generation.BoxMesh.create(
         comm, [np.array((0.0, 0.0, 0.0), dtype=np.float64), np.array((1.0, 1.0, 1.0), dtype=np.float64)],
         [nx, ny, nz], cell_type, ghost_mode)

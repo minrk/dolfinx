@@ -18,10 +18,8 @@ def test_distance_interval():
     mesh = UnitIntervalMesh(MPI.comm_self, 1)
     cell = Cell(mesh, 0)
 
-    print(cell.distance([-1.0]))
-
-#    assert round(cell.distance([-1.0]) - 1.0, 7) == 0
-#    assert round(cell.distance([0.5]) - 0.0, 7) == 0
+    assert round(cell.distance(numpy.array([-1.0, 0, 0])) - 1.0, 7) == 0
+    assert round(cell.distance(numpy.array([0.5, 0., 0.])) - 0.0, 7) == 0
 
 
 @skip_in_parallel
@@ -30,9 +28,9 @@ def test_distance_triangle():
     mesh = UnitSquareMesh(MPI.comm_self, 1, 1)
     cell = Cell(mesh, 1)
 
-    assert round(cell.distance([-1.0, -1.0]) - numpy.sqrt(2), 7) == 0
-    assert round(cell.distance([-1.0, 0.5]) - 1, 7) == 0
-    assert round(cell.distance([0.5, 0.5]) - 0.0, 7) == 0
+    assert round(cell.distance(numpy.array([-1.0, -1.0, 0])) - numpy.sqrt(2), 7) == 0
+    assert round(cell.distance(numpy.array([-1.0, 0.5, 0])) - 1, 7) == 0
+    assert round(cell.distance(numpy.array([0.5, 0.5, 0])) - 0.0, 7) == 0
 
 
 @skip_in_parallel
@@ -41,9 +39,9 @@ def test_distance_tetrahedron():
     mesh = UnitCubeMesh(MPI.comm_self, 1, 1, 1)
     cell = Cell(mesh, 5)
 
-    assert round(cell.distance([-1.0, -1.0, -1.0]) - numpy.sqrt(3), 7) == 0
-    assert round(cell.distance([-1.0, 0.5, 0.5]) - 1, 7) == 0
-    assert round(cell.distance([0.5, 0.5, 0.5]) - 0.0, 7) == 0
+    assert round(cell.distance(numpy.array([-1.0, -1.0, -1.0])) - numpy.sqrt(3), 7) == 0
+    assert round(cell.distance(numpy.array([-1.0, 0.5, 0.5])) - 1, 7) == 0
+    assert round(cell.distance(numpy.array([0.5, 0.5, 0.5])) - 0.0, 7) == 0
 
 
 @pytest.mark.xfail

@@ -7,6 +7,7 @@
 import pytest
 from dolfin import UnitSquareMesh, UnitCubeMesh, Face, Faces, MPI
 from dolfin_utils.test import skip_in_parallel, fixture
+import numpy
 
 
 @fixture
@@ -41,7 +42,7 @@ def test_NormalPoint(cube, square):
     cube.init(2)
     for f in Faces(cube):
         n = f.normal()
-        assert round(n.norm() - 1.0, 7) == 0
+        assert round(numpy.linalg.norm(n) - 1.0, 7) == 0
 
     f = Face(square, 0)
     with pytest.raises(RuntimeError):

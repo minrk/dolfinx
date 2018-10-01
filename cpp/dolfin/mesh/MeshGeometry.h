@@ -87,7 +87,9 @@ public:
             const std::vector<std::int64_t>& global_indices)
   {
     _num_points_global = num_points_global;
-    _coordinates = coordinates;
+    _coordinates.resize(coordinates.rows(), 3);
+    _coordinates.leftCols(coordinates.cols()) = coordinates;
+    _coordinates.rightCols(3 - coordinates.cols()) = 0.0;
     _global_indices = global_indices;
   }
 

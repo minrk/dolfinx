@@ -209,9 +209,9 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
   // Find the cell that contains x
   for (unsigned int i = 0; i != x.rows(); ++i)
   {
-    EigenPointVector point;
+    Eigen::Vector3d point;
     point.setZero();
-    point << x.row(i);
+    point.topRows(x.cols()) = x.row(i);
 
     // Get index of first cell containing point
     unsigned int id

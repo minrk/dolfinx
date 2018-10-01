@@ -171,7 +171,7 @@ def test_call(R, V, W, Q, mesh):
     u2.interpolate(e1)
     u3.interpolate(e2)
 
-    p0 = ((Vertex(mesh, 0).point() + Vertex(mesh, 1).point()) / 2.0).array()
+    p0 = (Vertex(mesh, 0).x() + Vertex(mesh, 1).x()) / 2.0
     x0 = (mesh.geometry.x(0) + mesh.geometry.x(1)) / 2.0
 
     assert round(u0(x0)[0] - u0(x0)[0], 7) == 0
@@ -247,7 +247,7 @@ def test_near_evaluations(R, mesh):
 
     u0 = Function(R)
     u0.vector()[:] = 1.0
-    a = Vertex(mesh, 0).point().array()
+    a = Vertex(mesh, 0).x()
     offset = 0.99 * DOLFIN_EPS
 
     a_shift_x = (a[0] - offset, a[1], a[2])
