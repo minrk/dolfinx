@@ -96,9 +96,9 @@ double TriangleCell::volume(const MeshEntity& triangle) const
 
   // Get the coordinates of the three vertices
   const std::int32_t* vertices = triangle.entities(0);
-  const EigenPointVector x0 = geometry.point(vertices[0]);
-  const EigenPointVector x1 = geometry.point(vertices[1]);
-  const EigenPointVector x2 = geometry.point(vertices[2]);
+  const Eigen::Vector3d x0 = geometry.x(vertices[0]);
+  const Eigen::Vector3d x1 = geometry.x(vertices[1]);
+  const Eigen::Vector3d x2 = geometry.x(vertices[2]);
 
   if (geometry.dim() == 2)
   {
@@ -152,9 +152,9 @@ double TriangleCell::circumradius(const MeshEntity& triangle) const
 
   // Get the coordinates of the three vertices
   const std::int32_t* vertices = triangle.entities(0);
-  const EigenPointVector p0 = geometry.point(vertices[0]);
-  const EigenPointVector p1 = geometry.point(vertices[1]);
-  const EigenPointVector p2 = geometry.point(vertices[2]);
+  const Eigen::Vector3d p0 = geometry.x(vertices[0]);
+  const Eigen::Vector3d p1 = geometry.x(vertices[1]);
+  const Eigen::Vector3d p2 = geometry.x(vertices[2]);
 
   // FIXME: Assuming 3D coordinates, could be more efficient if
   // FIXME: if we assumed 2D coordinates in 2D
@@ -170,23 +170,23 @@ double TriangleCell::circumradius(const MeshEntity& triangle) const
 }
 //-----------------------------------------------------------------------------
 double TriangleCell::squared_distance(const Cell& cell,
-                                      const EigenPointVector& point) const
+                                      const Eigen::Vector3d& point) const
 {
   // Get the vertices as points
   const MeshGeometry& geometry = cell.mesh().geometry();
   const std::int32_t* vertices = cell.entities(0);
-  const EigenPointVector a = geometry.point(vertices[0]);
-  const EigenPointVector b = geometry.point(vertices[1]);
-  const EigenPointVector c = geometry.point(vertices[2]);
+  const Eigen::Vector3d a = geometry.x(vertices[0]);
+  const Eigen::Vector3d b = geometry.x(vertices[1]);
+  const Eigen::Vector3d c = geometry.x(vertices[2]);
 
   // Call function to compute squared distance
   return squared_distance(point, a, b, c);
 }
 //-----------------------------------------------------------------------------
-double TriangleCell::squared_distance(const EigenPointVector& point,
-                                      const EigenPointVector& a,
-                                      const EigenPointVector& b,
-                                      const EigenPointVector& c)
+double TriangleCell::squared_distance(const Eigen::Vector3d& point,
+                                      const Eigen::Vector3d& a,
+                                      const Eigen::Vector3d& b,
+                                      const Eigen::Vector3d& c)
 {
   // Algorithm from Real-time collision detection by Christer Ericson:
   // ClosestPtPointTriangle on page 141, Section 5.1.5.
@@ -197,24 +197,24 @@ double TriangleCell::squared_distance(const EigenPointVector& point,
   // only return the distance to that point.
 
   // Compute normal to plane defined by triangle
-  const EigenPointVector ab = b - a;
-  const EigenPointVector ac = c - a;
-  EigenPointVector n = ab.cross(ac);
+  const Eigen::Vector3d ab = b - a;
+  const Eigen::Vector3d ac = c - a;
+  Eigen::Vector3d n = ab.cross(ac);
   n /= n.norm();
 
   // Subtract projection onto plane
   const double pn = (point - a).dot(n);
-  const EigenPointVector p = point - n * pn;
+  const Eigen::Vector3d p = point - n * pn;
 
   // Check if point is in vertex region outside A
-  const EigenPointVector ap = p - a;
+  const Eigen::Vector3d ap = p - a;
   const double d1 = ab.dot(ap);
   const double d2 = ac.dot(ap);
   if (d1 <= 0.0 && d2 <= 0.0)
     return (p - a).squaredNorm() + pn * pn;
 
   // Check if point is in vertex region outside B
-  const EigenPointVector bp = p - b;
+  const Eigen::Vector3d bp = p - b;
   const double d3 = ab.dot(bp);
   const double d4 = ac.dot(bp);
   if (d3 >= 0.0 && d4 <= d3)
@@ -229,7 +229,7 @@ double TriangleCell::squared_distance(const EigenPointVector& point,
   }
 
   // Check if point is in vertex region outside C
-  const EigenPointVector cp = p - c;
+  const Eigen::Vector3d cp = p - c;
   const double d5 = ab.dot(cp);
   const double d6 = ac.dot(cp);
   if (d6 >= 0.0 && d5 <= d6)
@@ -263,7 +263,7 @@ double TriangleCell::normal(const Cell& cell, std::size_t facet,
   return normal(cell, facet)[i];
 }
 //-----------------------------------------------------------------------------
-EigenPointVector TriangleCell::normal(const Cell& cell, std::size_t facet) const
+Eigen::Vector3d TriangleCell::normal(const Cell& cell, std::size_t facet) const
 {
   // Make sure we have facets
   cell.mesh().init(2, 1);
@@ -294,14 +294,14 @@ EigenPointVector TriangleCell::normal(const Cell& cell, std::size_t facet) const
   const MeshGeometry& geometry = cell.mesh().geometry();
 
   // Get the coordinates of the three vertices
-  const EigenPointVector p0 = geometry.point(v0);
-  const EigenPointVector p1 = geometry.point(v1);
-  const EigenPointVector p2 = geometry.point(v2);
+  const Eigen::Vector3d p0 = geometry.x(v0);
+  const Eigen::Vector3d p1 = geometry.x(v1);
+  const Eigen::Vector3d p2 = geometry.x(v2);
 
   // Subtract projection of p2 - p0 onto p2 - p1
-  EigenPointVector t = p2 - p1;
+  Eigen::Vector3d t = p2 - p1;
   t /= t.norm();
-  EigenPointVector n = p2 - p0;
+  Eigen::Vector3d n = p2 - p0;
   n -= t * n.dot(t);
 
   // Normalize
@@ -310,7 +310,7 @@ EigenPointVector TriangleCell::normal(const Cell& cell, std::size_t facet) const
   return n;
 }
 //-----------------------------------------------------------------------------
-EigenPointVector TriangleCell::cell_normal(const Cell& cell) const
+Eigen::Vector3d TriangleCell::cell_normal(const Cell& cell) const
 {
   // Get mesh geometry
   const MeshGeometry& geometry = cell.mesh().geometry();
@@ -325,14 +325,14 @@ EigenPointVector TriangleCell::cell_normal(const Cell& cell) const
 
   // Get the three vertices as points
   const std::int32_t* vertices = cell.entities(0);
-  const EigenPointVector p0 = geometry.point(vertices[0]);
-  const EigenPointVector p1 = geometry.point(vertices[1]);
-  const EigenPointVector p2 = geometry.point(vertices[2]);
+  const Eigen::Vector3d p0 = geometry.x(vertices[0]);
+  const Eigen::Vector3d p1 = geometry.x(vertices[1]);
+  const Eigen::Vector3d p2 = geometry.x(vertices[2]);
 
   // Defined cell normal via cross product of first two edges:
-  const EigenPointVector v01 = p1 - p0;
-  const EigenPointVector v02 = p2 - p0;
-  EigenPointVector n = v01.cross(v02);
+  const Eigen::Vector3d v01 = p1 - p0;
+  const Eigen::Vector3d v02 = p2 - p0;
+  Eigen::Vector3d n = v01.cross(v02);
 
   // Normalize
   n /= n.norm();
@@ -353,8 +353,8 @@ double TriangleCell::facet_area(const Cell& cell, std::size_t facet) const
   const MeshGeometry& geometry = cell.mesh().geometry();
 
   // Get the coordinates of the two vertices
-  const EigenPointVector p0 = geometry.point(v0);
-  const EigenPointVector p1 = geometry.point(v1);
+  const Eigen::Vector3d p0 = geometry.x(v0);
+  const Eigen::Vector3d p1 = geometry.x(v1);
 
   return (p1 - p0).norm();
 }

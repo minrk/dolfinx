@@ -99,10 +99,10 @@ double QuadrilateralCell::volume(const MeshEntity& cell) const
 
   // Get the coordinates of the four vertices
   const std::int32_t* vertices = cell.entities(0);
-  const EigenPointVector p0 = geometry.point(vertices[0]);
-  const EigenPointVector p1 = geometry.point(vertices[1]);
-  const EigenPointVector p2 = geometry.point(vertices[2]);
-  const EigenPointVector p3 = geometry.point(vertices[3]);
+  const Eigen::Vector3d p0 = geometry.x(vertices[0]);
+  const Eigen::Vector3d p1 = geometry.x(vertices[1]);
+  const Eigen::Vector3d p2 = geometry.x(vertices[2]);
+  const Eigen::Vector3d p3 = geometry.x(vertices[3]);
 
   if (geometry.dim() != 2 && geometry.dim() != 3)
   {
@@ -111,7 +111,7 @@ double QuadrilateralCell::volume(const MeshEntity& cell) const
                       "Only know how to compute volume in R^2 or R^3");
   }
 
-  const EigenPointVector c = (p0 - p3).cross(p1 - p2);
+  const Eigen::Vector3d c = (p0 - p3).cross(p1 - p2);
   const double volume = 0.5 * c.norm();
 
   if (geometry.dim() == 3)
@@ -154,7 +154,7 @@ double QuadrilateralCell::circumradius(const MeshEntity& cell) const
 }
 //-----------------------------------------------------------------------------
 double QuadrilateralCell::squared_distance(const Cell& cell,
-                                           const EigenPointVector& point) const
+                                           const Eigen::Vector3d& point) const
 {
   dolfin_not_implemented();
   return 0.0;
@@ -166,8 +166,8 @@ double QuadrilateralCell::normal(const Cell& cell, std::size_t facet,
   return normal(cell, facet)[i];
 }
 //-----------------------------------------------------------------------------
-EigenPointVector QuadrilateralCell::normal(const Cell& cell,
-                                           std::size_t facet) const
+Eigen::Vector3d QuadrilateralCell::normal(const Cell& cell,
+                                          std::size_t facet) const
 {
 
   // Make sure we have facets
@@ -194,14 +194,14 @@ EigenPointVector QuadrilateralCell::normal(const Cell& cell,
   const MeshGeometry& geometry = cell.mesh().geometry();
 
   // Get the coordinates of the three vertices
-  const EigenPointVector p0 = geometry.point(v0);
-  const EigenPointVector p1 = geometry.point(v1);
-  const EigenPointVector p2 = geometry.point(v2);
+  const Eigen::Vector3d p0 = geometry.x(v0);
+  const Eigen::Vector3d p1 = geometry.x(v1);
+  const Eigen::Vector3d p2 = geometry.x(v2);
 
   // Subtract projection of p2 - p0 onto p2 - p1
-  EigenPointVector t = p2 - p1;
+  Eigen::Vector3d t = p2 - p1;
   t /= t.norm();
-  EigenPointVector n = p2 - p0;
+  Eigen::Vector3d n = p2 - p0;
   n -= t * n.dot(t);
 
   // Normalize
@@ -210,7 +210,7 @@ EigenPointVector QuadrilateralCell::normal(const Cell& cell,
   return n;
 }
 //-----------------------------------------------------------------------------
-EigenPointVector QuadrilateralCell::cell_normal(const Cell& cell) const
+Eigen::Vector3d QuadrilateralCell::cell_normal(const Cell& cell) const
 {
   // Get mesh geometry
   const MeshGeometry& geometry = cell.mesh().geometry();
@@ -223,14 +223,14 @@ EigenPointVector QuadrilateralCell::cell_normal(const Cell& cell) const
 
   // Get the three vertices as points
   const std::int32_t* vertices = cell.entities(0);
-  const EigenPointVector p0 = geometry.point(vertices[0]);
-  const EigenPointVector p1 = geometry.point(vertices[1]);
-  const EigenPointVector p2 = geometry.point(vertices[2]);
+  const Eigen::Vector3d p0 = geometry.x(vertices[0]);
+  const Eigen::Vector3d p1 = geometry.x(vertices[1]);
+  const Eigen::Vector3d p2 = geometry.x(vertices[2]);
 
   // Defined cell normal via cross product of first two edges:
-  const EigenPointVector v01 = p1 - p0;
-  const EigenPointVector v02 = p2 - p0;
-  EigenPointVector n = v01.cross(v02);
+  const Eigen::Vector3d v01 = p1 - p0;
+  const Eigen::Vector3d v02 = p2 - p0;
+  Eigen::Vector3d n = v01.cross(v02);
 
   // Normalize
   n /= n.norm();
@@ -250,8 +250,8 @@ double QuadrilateralCell::facet_area(const Cell& cell, std::size_t facet) const
   // Get mesh geometry
   const MeshGeometry& geometry = cell.mesh().geometry();
 
-  const EigenPointVector p0 = geometry.point(v0);
-  const EigenPointVector p1 = geometry.point(v1);
+  const Eigen::Vector3d p0 = geometry.x(v0);
+  const Eigen::Vector3d p1 = geometry.x(v1);
 
   return (p0 - p1).norm();
 }

@@ -92,7 +92,7 @@ Eigen::VectorXd MeshEntity::midpoint() const
 {
   // Special case: a vertex is its own midpoint (don't check neighbors)
   if (_dim == 0)
-    return _mesh->geometry().point(_local_index);
+    return _mesh->geometry().x(_local_index);
 
   // Otherwise iterate over incident vertices and compute average
   std::size_t num_vertices = 0;
@@ -103,9 +103,9 @@ Eigen::VectorXd MeshEntity::midpoint() const
 
   for (auto& v : EntityRange<Vertex>(*this))
   {
-    x += v.point()[0];
-    y += v.point()[1];
-    z += v.point()[2];
+    x += v.x()[0];
+    y += v.x()[1];
+    z += v.x()[2];
     num_vertices++;
   }
 

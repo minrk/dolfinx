@@ -47,7 +47,7 @@ public:
   MeshGeometry& operator=(MeshGeometry&&) = default;
 
   /// Return Euclidean dimension of coordinate system
-  std::size_t dim() const { return _coordinates.cols(); }
+  std::size_t dim() const { return _gdim; }
 
   /// Return the number of local points in the geometry
   std::size_t num_points() const { return _coordinates.rows(); }
@@ -56,21 +56,24 @@ public:
   std::size_t num_points_global() const { return _num_points_global; }
 
   /// Return coordinate array for point with local index n
-  Eigen::Ref<const EigenRowArrayXd> x(std::size_t n) const
+  Eigen::Ref<const Eigen::Vector3d> x(std::size_t n) const
   {
     return _coordinates.row(n);
   }
 
-  /// Return coordinate with local index n as a 3D point value
-  EigenPointVector point(std::size_t n) const;
-
   // Should this return an Eigen::Ref?
   /// Return array of coordinates for all points
-  EigenRowArrayXXd& points() { return _coordinates; }
+  Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& points()
+  {
+    return _coordinates;
+  }
 
   // Should this return an Eigen::Ref?
   /// Return array of coordinates for all points (const version)
-  const EigenRowArrayXXd& points() const { return _coordinates; }
+  const Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& points() const
+  {
+    return _coordinates;
+  }
 
   /// Global indices for points (const)
   const std::vector<std::int64_t>& global_indices() const
@@ -79,7 +82,8 @@ public:
   }
 
   /// Initialise MeshGeometry data
-  void init(std::uint64_t num_points_global, const EigenRowArrayXXd& coordinates,
+  void init(std::uint64_t num_points_global,
+            const EigenRowArrayXXd& coordinates,
             const std::vector<std::int64_t>& global_indices)
   {
     _num_points_global = num_points_global;
@@ -102,7 +106,10 @@ public:
 
 private:
   // Coordinates for all points stored as a contiguous array
-  EigenRowArrayXXd _coordinates;
+  Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor> _coordinates;
+
+  // Geometric dimension
+  unsigned int _gdim;
 
   // Global indices for points
   std::vector<std::int64_t> _global_indices;

@@ -80,8 +80,8 @@ double IntervalCell::volume(const MeshEntity& interval) const
 
   // Get the coordinates of the two vertices
   const std::int32_t* vertices = interval.entities(0);
-  const EigenPointVector x0 = geometry.point(vertices[0]);
-  const EigenPointVector x1 = geometry.point(vertices[1]);
+  const Eigen::Vector3d x0 = geometry.x(vertices[0]);
+  const Eigen::Vector3d x1 = geometry.x(vertices[1]);
 
   return (x1 - x0).norm();
 }
@@ -100,26 +100,26 @@ double IntervalCell::circumradius(const MeshEntity& interval) const
 }
 //-----------------------------------------------------------------------------
 double IntervalCell::squared_distance(const Cell& cell,
-                                      const EigenPointVector& point) const
+                                      const Eigen::Vector3d& point) const
 {
   // Get the vertices as points
   const MeshGeometry& geometry = cell.mesh().geometry();
   const std::int32_t* vertices = cell.entities(0);
-  const EigenPointVector a = geometry.point(vertices[0]);
-  const EigenPointVector b = geometry.point(vertices[1]);
+  const Eigen::Vector3d a = geometry.x(vertices[0]);
+  const Eigen::Vector3d b = geometry.x(vertices[1]);
 
   // Call function to compute squared distance
   return squared_distance(point, a, b);
 }
 //-----------------------------------------------------------------------------
-double IntervalCell::squared_distance(const EigenPointVector& point,
-                                      const EigenPointVector& a,
-                                      const EigenPointVector& b)
+double IntervalCell::squared_distance(const Eigen::Vector3d& point,
+                                      const Eigen::Vector3d& a,
+                                      const Eigen::Vector3d& b)
 {
   // Compute vector
-  const EigenPointVector v0 = point - a;
-  const EigenPointVector v1 = point - b;
-  const EigenPointVector v01 = b - a;
+  const Eigen::Vector3d v0 = point - a;
+  const Eigen::Vector3d v1 = point - b;
+  const Eigen::Vector3d v01 = b - a;
 
   // Check if a is closest point (outside of interval)
   const double a0 = v0.dot(v01);
@@ -141,18 +141,18 @@ double IntervalCell::normal(const Cell& cell, std::size_t facet,
   return normal(cell, facet)[i];
 }
 //-----------------------------------------------------------------------------
-EigenPointVector IntervalCell::normal(const Cell& cell, std::size_t facet) const
+Eigen::Vector3d IntervalCell::normal(const Cell& cell, std::size_t facet) const
 {
   // Get mesh geometry
   const MeshGeometry& geometry = cell.mesh().geometry();
 
   // Get the two vertices as points
   const std::int32_t* vertices = cell.entities(0);
-  EigenPointVector p0 = geometry.point(vertices[0]);
-  EigenPointVector p1 = geometry.point(vertices[1]);
+  Eigen::Vector3d p0 = geometry.x(vertices[0]);
+  Eigen::Vector3d p1 = geometry.x(vertices[1]);
 
   // Compute normal
-  EigenPointVector n = p0 - p1;
+  Eigen::Vector3d n = p0 - p1;
   if (facet == 1)
     n *= -1.0;
 
@@ -162,7 +162,7 @@ EigenPointVector IntervalCell::normal(const Cell& cell, std::size_t facet) const
   return n;
 }
 //-----------------------------------------------------------------------------
-EigenPointVector IntervalCell::cell_normal(const Cell& cell) const
+Eigen::Vector3d IntervalCell::cell_normal(const Cell& cell) const
 {
   // Get mesh geometry
   const MeshGeometry& geometry = cell.mesh().geometry();
@@ -175,12 +175,12 @@ EigenPointVector IntervalCell::cell_normal(const Cell& cell) const
 
   // Get the two vertices as points
   const std::int32_t* vertices = cell.entities(0);
-  EigenPointVector p0 = geometry.point(vertices[0]);
-  EigenPointVector p1 = geometry.point(vertices[1]);
+  Eigen::Vector3d p0 = geometry.x(vertices[0]);
+  Eigen::Vector3d p1 = geometry.x(vertices[1]);
 
   // Define normal by rotating tangent counterclockwise
-  EigenPointVector t = p1 - p0;
-  EigenPointVector n;
+  Eigen::Vector3d t = p1 - p0;
+  Eigen::Vector3d n;
   n << -t[1], t[0], 0.0;
 
   // Normalize

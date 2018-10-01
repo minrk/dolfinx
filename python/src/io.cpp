@@ -6,7 +6,6 @@
 
 #include <dolfin/function/Function.h>
 #include <dolfin/function/FunctionSpace.h>
-#include <dolfin/geometry/Point.h>
 #include <dolfin/io/HDF5File.h>
 #include <dolfin/io/XDMFFile.h>
 #include <dolfin/la/PETScVector.h>
@@ -14,6 +13,7 @@
 #include <dolfin/mesh/MeshFunction.h>
 #include <dolfin/mesh/MeshValueCollection.h>
 #include <memory>
+#include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -207,7 +207,7 @@ void io(py::module& m)
       // Points
       .def("write",
            [](dolfin::io::XDMFFile& instance, py::list points) {
-             auto _points = points.cast<std::vector<dolfin::geometry::Point>>();
+             auto _points = points.cast<std::vector<Eigen::Vector3d>>();
              instance.write(_points);
            },
            py::arg("points"))
@@ -215,7 +215,7 @@ void io(py::module& m)
       .def("write",
            [](dolfin::io::XDMFFile& instance, py::list points,
               std::vector<double>& values) {
-             auto _points = points.cast<std::vector<dolfin::geometry::Point>>();
+             auto _points = points.cast<std::vector<Eigen::Vector3d>>();
              instance.write(_points, values);
            },
            py::arg("points"), py::arg("values"))

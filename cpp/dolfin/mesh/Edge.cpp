@@ -21,8 +21,8 @@ double Edge::length() const
   const Vertex v0(*_mesh, vertices[0]);
   const Vertex v1(*_mesh, vertices[1]);
 
-  const EigenPointVector p0 = v0.point();
-  const EigenPointVector p1 = v1.point();
+  const Eigen::Vector3d p0 = v0.x();
+  const Eigen::Vector3d p1 = v1.x();
 
   return (p0 - p1).norm();
 }

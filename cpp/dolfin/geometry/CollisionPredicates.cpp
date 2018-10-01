@@ -52,26 +52,23 @@ bool CollisionPredicates::collides(const mesh::MeshEntity& entity,
 
   // Pick correct specialized implementation
   if (tdim == 1 && gdim == 1)
-    return collides_segment_point_1d(g.point(v[0])[0], g.point(v[1])[0],
-                                     point[0]);
+    return collides_segment_point_1d(g.x(v[0])[0], g.x(v[1])[0], point[0]);
 
   if (tdim == 1 && gdim == 2)
-    return collides_segment_point_2d(g.point(v[0]), g.point(v[1]), point);
+    return collides_segment_point_2d(g.x(v[0]), g.x(v[1]), point);
 
   if (tdim == 1 && gdim == 3)
-    return collides_segment_point_3d(g.point(v[0]), g.point(v[1]), point);
+    return collides_segment_point_3d(g.x(v[0]), g.x(v[1]), point);
 
   if (tdim == 2 && gdim == 2)
-    return collides_triangle_point_2d(g.point(v[0]), g.point(v[1]),
-                                      g.point(v[2]), point);
+    return collides_triangle_point_2d(g.x(v[0]), g.x(v[1]), g.x(v[2]), point);
 
   if (tdim == 2 && gdim == 3)
-    return collides_triangle_point_3d(g.point(v[0]), g.point(v[1]),
-                                      g.point(v[2]), point);
+    return collides_triangle_point_3d(g.x(v[0]), g.x(v[1]), g.x(v[2]), point);
 
   if (tdim == 3)
-    return collides_tetrahedron_point_3d(g.point(v[0]), g.point(v[1]),
-                                         g.point(v[2]), g.point(v[3]), point);
+    return collides_tetrahedron_point_3d(g.x(v[0]), g.x(v[1]), g.x(v[2]),
+                                         g.x(v[3]), point);
 
   log::dolfin_error("CollisionPredicates.cpp", "compute entity-point collision",
                     "Not implemented for dimensions %d / %d", tdim, gdim);
@@ -103,50 +100,48 @@ bool CollisionPredicates::collides(const mesh::MeshEntity& entity_0,
   // Pick correct specialized implementation
   if (d0 == 1 && d1 == 1)
   {
-    return collides_segment_segment(g0.point(v0[0]), g0.point(v0[1]),
-                                    g1.point(v1[0]), g1.point(v1[1]), gdim);
+    return collides_segment_segment(g0.x(v0[0]), g0.x(v0[1]), g1.x(v1[0]),
+                                    g1.x(v1[1]), gdim);
   }
 
   if (d0 == 1 && d1 == 2)
   {
-    return collides_triangle_segment(g1.point(v1[0]), g1.point(v1[1]),
-                                     g1.point(v1[2]), g0.point(v0[0]),
-                                     g0.point(v0[1]), gdim);
+    return collides_triangle_segment(g1.x(v1[0]), g1.x(v1[1]), g1.x(v1[2]),
+                                     g0.x(v0[0]), g0.x(v0[1]), gdim);
   }
 
   if (d0 == 2 && d1 == 1)
   {
-    return collides_triangle_segment(g0.point(v0[0]), g0.point(v0[1]),
-                                     g0.point(v0[2]), g1.point(v1[0]),
-                                     g1.point(v1[1]), gdim);
+    return collides_triangle_segment(g0.x(v0[0]), g0.x(v0[1]), g0.x(v0[2]),
+                                     g1.x(v1[0]), g1.x(v1[1]), gdim);
   }
 
   if (d0 == 2 && d1 == 2)
   {
-    return collides_triangle_triangle(g0.point(v0[0]), g0.point(v0[1]),
-                                      g0.point(v0[2]), g1.point(v1[0]),
-                                      g1.point(v1[1]), g1.point(v1[2]), gdim);
+    return collides_triangle_triangle(g0.x(v0[0]), g0.x(v0[1]), g0.x(v0[2]),
+                                      g1.x(v1[0]), g1.x(v1[1]), g1.x(v1[2]),
+                                      gdim);
   }
 
   if (d0 == 2 && d1 == 3)
   {
     return collides_tetrahedron_triangle_3d(
-        g1.point(v1[0]), g1.point(v1[1]), g1.point(v1[2]), g1.point(v1[3]),
-        g0.point(v0[0]), g0.point(v0[1]), g0.point(v0[2]));
+        g1.x(v1[0]), g1.x(v1[1]), g1.x(v1[2]), g1.x(v1[3]), g0.x(v0[0]),
+        g0.x(v0[1]), g0.x(v0[2]));
   }
 
   if (d0 == 3 && d1 == 2)
   {
     return collides_tetrahedron_triangle_3d(
-        g0.point(v0[0]), g0.point(v0[1]), g0.point(v0[2]), g0.point(v0[3]),
-        g1.point(v1[0]), g1.point(v1[1]), g1.point(v1[2]));
+        g0.x(v0[0]), g0.x(v0[1]), g0.x(v0[2]), g0.x(v0[3]), g1.x(v1[0]),
+        g1.x(v1[1]), g1.x(v1[2]));
   }
 
   if (d0 == 3 && d1 == 3)
   {
     return collides_tetrahedron_tetrahedron_3d(
-        g0.point(v0[0]), g0.point(v0[1]), g0.point(v0[2]), g0.point(v0[3]),
-        g1.point(v1[0]), g1.point(v1[1]), g1.point(v1[2]), g1.point(v1[3]));
+        g0.x(v0[0]), g0.x(v0[1]), g0.x(v0[2]), g0.x(v0[3]), g1.x(v1[0]),
+        g1.x(v1[1]), g1.x(v1[2]), g1.x(v1[3]));
   }
 
   log::dolfin_error("CollisionPredicates.cpp",

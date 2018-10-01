@@ -14,17 +14,9 @@ using namespace dolfin::mesh;
 
 //-----------------------------------------------------------------------------
 MeshGeometry::MeshGeometry(const Eigen::Ref<const EigenRowArrayXXd>& points)
-    : _coordinates(points)
+    : _coordinates(points), _gdim(points.cols())
 {
   // Do nothing
-}
-//-----------------------------------------------------------------------------
-EigenPointVector MeshGeometry::point(std::size_t n) const
-{
-  EigenPointVector p;
-  p.setZero();
-  p << _coordinates.row(n);
-  return p;
 }
 //-----------------------------------------------------------------------------
 std::size_t MeshGeometry::hash() const

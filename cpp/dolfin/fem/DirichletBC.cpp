@@ -769,10 +769,10 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
     // Create points
     EigenPointVector p;
     p << coordinates[0], coordinates[1];
-    const EigenPointVector v0
-        = mesh::Vertex(facet.mesh(), facet.entities(0)[0]).point();
-    const EigenPointVector v1
-        = mesh::Vertex(facet.mesh(), facet.entities(0)[1]).point();
+    const Eigen::Vector3d v0
+        = mesh::Vertex(facet.mesh(), facet.entities(0)[0]).x();
+    const Eigen::Vector3d v1
+        = mesh::Vertex(facet.mesh(), facet.entities(0)[1]).x();
 
     // Create vectors
     const EigenPointVector v01 = v1 - v0;
@@ -793,12 +793,12 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
     // Create points
     EigenPointVector p;
     p << coordinates[0], coordinates[1], coordinates[2];
-    const EigenPointVector v0
-        = mesh::Vertex(facet.mesh(), facet.entities(0)[0]).point();
-    const EigenPointVector v1
-        = mesh::Vertex(facet.mesh(), facet.entities(0)[1]).point();
-    const EigenPointVector v2
-        = mesh::Vertex(facet.mesh(), facet.entities(0)[2]).point();
+    const Eigen::Vector3d v0
+        = mesh::Vertex(facet.mesh(), facet.entities(0)[0]).x();
+    const Eigen::Vector3d v1
+        = mesh::Vertex(facet.mesh(), facet.entities(0)[1]).x();
+    const Eigen::Vector3d v2
+        = mesh::Vertex(facet.mesh(), facet.entities(0)[2]).x();
 
     // Create vectors
     const EigenPointVector v01 = v1 - v0;
