@@ -6,10 +6,12 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import pytest
 import numpy
-from dolfin import (RectangleMesh, MPI, CellType, FunctionSpace, Constant,
-                    TestFunction, TrialFunction, inner, grad, dx, system, lhs, rhs)
+import pytest
+
+from dolfin import (MPI, CellType, Constant, FunctionSpace, RectangleMesh,
+                    TestFunction, TrialFunction, dx, grad, inner, lhs, rhs,
+                    system)
 
 
 @pytest.mark.skip
@@ -17,7 +19,9 @@ def test_lhs_rhs_simple():
     """Test taking lhs/rhs of DOLFIN specific forms (constants
     without cell). """
 
-    mesh = RectangleMesh.create(MPI.comm_world, [numpy.array((0, 0)), numpy.array((2, 1))], [3, 5], CellType.Type.triangle)
+    mesh = RectangleMesh.create(
+        MPI.comm_world, [numpy.array(
+            (0, 0)), numpy.array((2, 1))], [3, 5], CellType.Type.triangle)
     V = FunctionSpace(mesh, "CG", 1)
     f = Constant(2.0)
     g = Constant(3.0)
@@ -29,7 +33,7 @@ def test_lhs_rhs_simple():
 
     Fl = lhs(F)
     Fr = rhs(F)
-    assert(Fr)
+    assert (Fr)
 
     a0 = inner(grad(v), grad(u)) * dx
 

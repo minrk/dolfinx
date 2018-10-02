@@ -6,19 +6,21 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import pytest
 import math
-from dolfin import (UnitIntervalMesh, SpatialCoordinate, dx, ds, MPI,
-                    RectangleMesh, FacetNormal)
-from ufl import (elem_pow, elem_op, elem_div, elem_mult, det, tr, cross, inner, diff,
-                 outer, div, grad, dot, as_vector, as_matrix, dev, skew, sym,
-                 atan, acos, asin, sin, cos, tan, exp, ln, erf,
-                 bessel_I, bessel_J, bessel_K, bessel_Y)
+
+import numpy
+import pytest
+
+from dolfin import (MPI, FacetNormal, RectangleMesh, SpatialCoordinate,
+                    UnitIntervalMesh, ds, dx)
+from ufl import (acos, as_matrix, as_vector, asin, atan, bessel_I, bessel_J,
+                 bessel_K, bessel_Y, cos, cross, det, dev, diff, div, dot,
+                 elem_div, elem_mult, elem_op, elem_pow, erf, exp, grad, inner,
+                 ln, outer, sin, skew, sym, tan, tr)
 
 
 @pytest.mark.skip
 def test_diff_then_integrate():
-
     # Define 1D geometry
     n = 21
     mesh = UnitIntervalMesh(MPI.comm_world, n)
@@ -66,23 +68,32 @@ def test_diff_then_integrate():
     if hasattr(math, 'erf') or scipy is not None:
         reg([erf(xs)])
     else:
-        print("Warning: skipping test of erf, old python version and no scipy.")
+        print(
+            "Warning: skipping test of erf, old python version and no scipy.")
 
     if 0:
-        print("Warning: skipping tests of bessel functions, doesn't build on all platforms.")
+        print(
+            "Warning: skipping tests of bessel functions, doesn't build on all platforms."
+        )
     elif scipy is None:
         print("Warning: skipping tests of bessel functions, missing scipy.")
     else:
         for nu in (0, 1, 2):
             # Many of these are possibly more accurately integrated,
             # but 4 covers all and is sufficient for this test
-            reg([bessel_J(nu, xs), bessel_Y(nu, xs), bessel_I(nu, xs), bessel_K(nu, xs)], 4)
+            reg([
+                bessel_J(nu, xs),
+                bessel_Y(nu, xs),
+                bessel_I(nu, xs),
+                bessel_K(nu, xs)
+            ], 4)
 
     # To handle tensor algebra, make an x dependent input tensor
     # xx and square all expressions
     def reg2(exprs, acc=10):
         for expr in exprs:
             F_list.append((inner(expr, expr), acc))
+
     xx = as_matrix([[2 * x**2, 3 * x**3], [11 * x**5, 7 * x**4]])
     x3v = as_vector([3 * x**2, 5 * x**3, 7 * x**4])
     cc = as_matrix([[2, 3], [4, 5]])
@@ -134,7 +145,7 @@ def test_diff_then_integrate():
 
         # Compute integral of f manually from anti-derivative F
         # (passes through PyDOLFIN interface and uses UFL evaluation)
-        F_diff = F((x1,)) - F((x0,))
+        F_diff = F((x1, )) - F((x0, ))
 
         # Compare results. Using custom relative delta instead
         # of decimal digits here because some numbers are >> 1.
@@ -147,11 +158,12 @@ def test_div_grad_then_integrate_over_cells_and_boundary():
 
     # Define 2D geometry
     n = 10
-    mesh = RectangleMesh(numpy.array((0.0, 0.0)), numpy.array((2.0, 3.0)), 2 * n, 3 * n)
+    mesh = RectangleMesh(
+        numpy.array((0.0, 0.0)), numpy.array((2.0, 3.0)), 2 * n, 3 * n)
 
     x, y = SpatialCoordinate(mesh)
     xs = 0.1 + 0.8 * x / 2  # scaled to be within [0.1,0.9]
-#    ys = 0.1 + 0.8 * y / 3  # scaled to be within [0.1,0.9]
+    #    ys = 0.1 + 0.8 * y / 3  # scaled to be within [0.1,0.9]
     n = FacetNormal(mesh)
 
     # Define list of expressions to test, and configure accuracies
@@ -171,7 +183,9 @@ def test_div_grad_then_integrate_over_cells_and_boundary():
     reg(monomial_list)
     reg([2.3 * p + 4.5 * q for p in monomial_list for q in monomial_list])
     reg([xs**xs])
-    reg([xs**(xs**2)], 8)  # Note: Accuracies here are from 1D case, not checked against 2D results.
+    reg(
+        [xs**(xs**2)], 8
+    )  # Note: Accuracies here are from 1D case, not checked against 2D results.
     reg([xs**(xs**3)], 6)
     reg([xs**(xs**4)], 2)
     # Special functions:
@@ -186,11 +200,14 @@ def test_div_grad_then_integrate_over_cells_and_boundary():
     def reg2(exprs, acc=10):
         for expr in exprs:
             F_list.append((inner(expr, expr), acc))
+
     xx = as_matrix([[2 * x**2, 3 * x**3], [11 * x**5, 7 * x**4]])
     xxs = as_matrix([[2 * xs**2, 3 * xs**3], [11 * xs**5, 7 * xs**4]])
     x3v = as_vector([3 * x**2, 5 * x**3, 7 * x**4])
     cc = as_matrix([[2, 3], [4, 5]])
-    reg2([xx])  # TODO: Make unit test for UFL from this, results in listtensor with free indices
+    reg2(
+        [xx]
+    )  # TODO: Make unit test for UFL from this, results in listtensor with free indices
     reg2([x3v])
     reg2([cross(3 * x3v, as_vector([-x3v[1], x3v[0], x3v[2]]))])
     reg2([xx.T])
