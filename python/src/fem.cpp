@@ -7,7 +7,6 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <memory>
-#include <pybind11/cast.h>
 #include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -22,7 +21,6 @@
 
 #include "casters.h"
 #include <dolfin/common/types.h>
-#include <dolfin/fem/Assembler.h>
 #include <dolfin/fem/CoordinateMapping.h>
 #include <dolfin/fem/DirichletBC.h>
 #include <dolfin/fem/DiscreteOperators.h>
@@ -33,6 +31,7 @@
 #include <dolfin/fem/PETScDMCollection.h>
 #include <dolfin/fem/SparsityPatternBuilder.h>
 #include <dolfin/fem/SystemAssembler.h>
+#include <dolfin/fem/assembler.h>
 #include <dolfin/fem/utils.h>
 #include <dolfin/function/Function.h>
 #include <dolfin/function/FunctionSpace.h>
@@ -138,39 +137,28 @@ void fem(py::module& m)
       .def("neighbours", &dolfin::fem::GenericDofMap::neighbours)
       .def("shared_nodes", &dolfin::fem::GenericDofMap::shared_nodes)
       .def("cell_dofs", &dolfin::fem::GenericDofMap::cell_dofs)
-      .def("dofs", (std::vector<PetscInt>(
+      .def("dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
                        dolfin::fem::GenericDofMap::*)() const)
                        & dolfin::fem::GenericDofMap::dofs)
-      .def("dofs",
-           (std::vector<PetscInt>(dolfin::fem::GenericDofMap::*)(
-               const dolfin::mesh::Mesh&, std::size_t) const)
-               & dolfin::fem::GenericDofMap::dofs)
-      .def("entity_dofs",
-           (std::vector<PetscInt>(dolfin::fem::GenericDofMap::*)(
-               const dolfin::mesh::Mesh&, std::size_t) const)
-               & dolfin::fem::GenericDofMap::entity_dofs)
-      .def("entity_dofs",
-           (std::vector<PetscInt>(dolfin::fem::GenericDofMap::*)(
-               const dolfin::mesh::Mesh&, std::size_t,
-               const std::vector<std::size_t>&) const)
-               & dolfin::fem::GenericDofMap::entity_dofs)
+      .def("dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
+                       dolfin::fem::GenericDofMap::*)(const dolfin::mesh::Mesh&,
+                                                      std::size_t) const)
+                       & dolfin::fem::GenericDofMap::dofs)
+      .def("entity_dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
+                              dolfin::fem::GenericDofMap::*)(
+                              const dolfin::mesh::Mesh&, std::size_t) const)
+                              & dolfin::fem::GenericDofMap::entity_dofs)
+      .def("entity_dofs", (Eigen::Array<PetscInt, Eigen::Dynamic, 1>(
+                              dolfin::fem::GenericDofMap::*)(
+                              const dolfin::mesh::Mesh&, std::size_t,
+                              const std::vector<std::size_t>&) const)
+                              & dolfin::fem::GenericDofMap::entity_dofs)
       .def("num_entity_dofs", &dolfin::fem::GenericDofMap::num_entity_dofs)
       .def("tabulate_local_to_global_dofs",
            &dolfin::fem::GenericDofMap::tabulate_local_to_global_dofs)
       .def("tabulate_entity_dofs",
-           [](const dolfin::fem::GenericDofMap& instance,
-              std::size_t entity_dim, std::size_t cell_entity_index) {
-             std::vector<int> dofs(instance.num_entity_dofs(entity_dim));
-             instance.tabulate_entity_dofs(dofs, entity_dim, cell_entity_index);
-             return py::array_t<int>(dofs.size(), dofs.data());
-           })
+           &dolfin::fem::GenericDofMap::tabulate_entity_dofs)
       .def("block_size", &dolfin::fem::GenericDofMap::block_size)
-      .def("tabulate_local_to_global_dofs",
-           [](const dolfin::fem::GenericDofMap& instance) {
-             std::vector<std::size_t> dofs
-                 = instance.tabulate_local_to_global_dofs();
-             return py::array_t<std::size_t>(dofs.size(), dofs.data());
-           })
       .def("set", &dolfin::fem::GenericDofMap::set);
 
   // dolfin::fem::DofMap
@@ -218,22 +206,21 @@ void fem(py::module& m)
       .value("geometric", dolfin::fem::DirichletBC::Method::geometric)
       .value("pointwise", dolfin::fem::DirichletBC::Method::pointwise);
 
-  dirichletbc.def(py::init<const dolfin::fem::DirichletBC&>())
+  dirichletbc
       .def(py::init<std::shared_ptr<const dolfin::function::FunctionSpace>,
                     std::shared_ptr<const dolfin::function::GenericFunction>,
                     std::shared_ptr<const dolfin::mesh::SubDomain>,
                     dolfin::fem::DirichletBC::Method, bool>(),
-           py::arg("V"), py::arg("g"), py::arg("sub_domain"),
-           py::arg("method") = dolfin::fem::DirichletBC::Method::topological,
-           py::arg("check_midpoint") = true)
-      .def(py::init<
-               std::shared_ptr<const dolfin::function::FunctionSpace>,
-               std::shared_ptr<const dolfin::function::GenericFunction>,
-               std::shared_ptr<const dolfin::mesh::MeshFunction<std::size_t>>,
-               std::size_t, dolfin::fem::DirichletBC::Method>(),
-           py::arg("V"), py::arg("g"), py::arg("sub_domains"),
-           py::arg("sub_domain"),
-           py::arg("method") = dolfin::fem::DirichletBC::Method::topological)
+           py::arg("V"), py::arg("g"), py::arg("sub_domain"), py::arg("method"),
+           py::arg("check_midpoint"))
+      .def(
+          py::init<std::shared_ptr<const dolfin::function::FunctionSpace>,
+                   std::shared_ptr<const dolfin::function::GenericFunction>,
+                   std::pair<std::shared_ptr<
+                                 const dolfin::mesh::MeshFunction<std::size_t>>,
+                             std::size_t>,
+                   dolfin::fem::DirichletBC::Method>(),
+          py::arg("V"), py::arg("g"), py::arg("sub_domain"), py::arg("method"))
       .def("function_space", &dolfin::fem::DirichletBC::function_space)
       .def("homogenize", &dolfin::fem::DirichletBC::homogenize)
       .def("method", &dolfin::fem::DirichletBC::method)
@@ -244,47 +231,68 @@ void fem(py::module& m)
              return map;
            })
       .def("user_subdomain", &dolfin::fem::DirichletBC::user_sub_domain)
-      .def("set_value", &dolfin::fem::DirichletBC::set_value)
-      .def("set_value", [](dolfin::fem::DirichletBC& self, py::object value) {
-        auto _u = value.attr("_cpp_object")
-                      .cast<std::shared_ptr<
-                          const dolfin::function::GenericFunction>>();
-        self.set_value(_u);
-      });
+      .def("set_value", &dolfin::fem::DirichletBC::set_value);
 
-  // dolfin::fem::Assembler
-  py::class_<dolfin::fem::Assembler, std::shared_ptr<dolfin::fem::Assembler>>
-      assembler(
-          m, "Assembler",
-          "Assembler object for assembling forms into matrices and vectors");
+  py::enum_<dolfin::fem::BlockType>(
+      m, "BlockType",
+      "Enum for matrix/vector assembly type for nested problems")
+      //   .value("monolithic", dolfin::fem::BlockType::monolithic,
+      //          "Use monolithic linear algebra data structures for block
+      //          forms")
+      //   .value("nested", dolfin::fem::BlockType::nested,
+      //          "Use nested linear algebra data structures for block forms");
+      .value("monolithic", dolfin::fem::BlockType::monolithic)
+      .value("nested", dolfin::fem::BlockType::nested);
 
-  // dolfin::fem::Assembler::BlockType enum
-  py::enum_<dolfin::fem::Assembler::BlockType>(assembler, "BlockType")
-      .value("nested", dolfin::fem::Assembler::BlockType::nested)
-      .value("monolithic", dolfin::fem::Assembler::BlockType::monolithic);
+  // dolfin::fem::assemble
+  m.def("assemble",
+        py::overload_cast<const dolfin::fem::Form&>(&dolfin::fem::assemble),
+        "Assemble form over mesh");
+  m.def("assemble_blocked_vector",
+        py::overload_cast<
+            std::vector<const dolfin::fem::Form*>,
+            const std::vector<
+                std::vector<std::shared_ptr<const dolfin::fem::Form>>>,
+            std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>,
+            dolfin::fem::BlockType, double>(&dolfin::fem::assemble),
+        py::arg("L"), py::arg("a"), py::arg("bcs"), py::arg("block_type"),
+        py::arg("scale") = 1.0,
+        "Assemble linear forms over mesh into blocked vector");
+  m.def(
+      "reassemble_blocked_vector",
+      py::overload_cast<
+          dolfin::la::PETScVector&, std::vector<const dolfin::fem::Form*>,
+          const std::vector<
+              std::vector<std::shared_ptr<const dolfin::fem::Form>>>,
+          std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>, double>(
+          &dolfin::fem::assemble),
+      py::arg("b"), py::arg("L"), py::arg("a"), py::arg("bcs"),
+      py::arg("scale") = 1.0,
+      "Re-assemble linear forms over mesh into blocked vector");
 
-  // dolfin::fem::Assembler
-  assembler
-      .def(py::init<
-           std::vector<std::vector<std::shared_ptr<const dolfin::fem::Form>>>,
-           std::vector<std::shared_ptr<const dolfin::fem::Form>>,
-           std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>>())
-      .def(
-          "assemble",
-          py::overload_cast<dolfin::la::PETScMatrix&, dolfin::la::PETScVector&>(
-              &dolfin::fem::Assembler::assemble))
-      .def("assemble", py::overload_cast<dolfin::la::PETScMatrix&,
-                                         dolfin::fem::Assembler::BlockType>(
-                           &dolfin::fem::Assembler::assemble))
-      .def("assemble", py::overload_cast<dolfin::la::PETScVector&,
-                                         dolfin::fem::Assembler::BlockType>(
-                           &dolfin::fem::Assembler::assemble));
+  m.def("assemble_blocked_matrix",
+        py::overload_cast<
+            const std::vector<std::vector<const dolfin::fem::Form*>>,
+            std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>,
+            dolfin::fem::BlockType, double>(&dolfin::fem::assemble),
+        py::arg("a"), py::arg("bcs"), py::arg("block_type"),
+        py::arg("diagonal"),
+        "Assemble bilinear forms over mesh into blocked matrix");
+  m.def(
+      "reassemble_blocked_matrix",
+      py::overload_cast<
+          dolfin::la::PETScMatrix&,
+          const std::vector<std::vector<const dolfin::fem::Form*>>,
+          std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>, double>(
+          &dolfin::fem::assemble),
+      py::arg("A"), py::arg("a"), py::arg("bcs"), py::arg("diagonal"),
+      "Re-assemble bilinear forms over mesh into blocked matrix");
+  m.def("set_bc", &dolfin::fem::set_bc,
+        "Insert boundary condition values into vector");
 
   // dolfin::fem::AssemblerBase
   py::class_<dolfin::fem::AssemblerBase,
              std::shared_ptr<dolfin::fem::AssemblerBase>>(m, "AssemblerBase")
-      //.def("init_global_tensor",
-      //&dolfin::fem::AssemblerBase::init_global_tensor)
       .def_readwrite("add_values", &dolfin::fem::AssemblerBase::add_values)
       .def_readwrite("keep_diagonal",
                      &dolfin::fem::AssemblerBase::keep_diagonal)
@@ -321,14 +329,7 @@ void fem(py::module& m)
   // dolfin::fem::DiscreteOperators
   py::class_<dolfin::fem::DiscreteOperators>(m, "DiscreteOperators")
       .def_static("build_gradient",
-                  &dolfin::fem::DiscreteOperators::build_gradient)
-      .def_static("build_gradient", [](py::object V0, py::object V1) {
-        auto _V0
-            = V0.attr("_cpp_object").cast<dolfin::function::FunctionSpace*>();
-        auto _V1
-            = V1.attr("_cpp_object").cast<dolfin::function::FunctionSpace*>();
-        return dolfin::fem::DiscreteOperators::build_gradient(*_V0, *_V1);
-      });
+                  &dolfin::fem::DiscreteOperators::build_gradient);
 
   // dolfin::fem::Form
   py::class_<dolfin::fem::Form, std::shared_ptr<dolfin::fem::Form>>(
@@ -375,23 +376,14 @@ void fem(py::module& m)
                    std::shared_ptr<dolfin::function::Function>,
                    std::vector<std::shared_ptr<const dolfin::fem::DirichletBC>>,
                    std::shared_ptr<const dolfin::fem::Form>>())
-      // FIXME: is there a better way to handle the casting
       .def("set_bounds",
-           (void (dolfin::fem::NonlinearVariationalProblem::*)(
-               std::shared_ptr<const dolfin::la::PETScVector>,
-               std::shared_ptr<const dolfin::la::PETScVector>))
-               & dolfin::fem::NonlinearVariationalProblem::set_bounds)
+           py::overload_cast<std::shared_ptr<const dolfin::la::PETScVector>,
+                             std::shared_ptr<const dolfin::la::PETScVector>>(
+               &dolfin::fem::NonlinearVariationalProblem::set_bounds))
       .def("set_bounds",
-           (void (dolfin::fem::NonlinearVariationalProblem::*)(
-               const dolfin::function::Function&,
-               const dolfin::function::Function&))
-               & dolfin::fem::NonlinearVariationalProblem::set_bounds)
-      .def("set_bounds", [](dolfin::fem::NonlinearVariationalProblem& self,
-                            py::object lb, py::object ub) {
-        auto& _lb = lb.attr("_cpp_object").cast<dolfin::function::Function&>();
-        auto& _ub = ub.attr("_cpp_object").cast<dolfin::function::Function&>();
-        self.set_bounds(_lb, _ub);
-      });
+           py::overload_cast<const dolfin::function::Function&,
+                             const dolfin::function::Function&>(
+               &dolfin::fem::NonlinearVariationalProblem::set_bounds));
 
   // dolfin::fem::PETScDMCollection
   py::class_<dolfin::fem::PETScDMCollection,
@@ -399,29 +391,8 @@ void fem(py::module& m)
       m, "PETScDMCollection")
       .def(py::init<std::vector<
                std::shared_ptr<const dolfin::function::FunctionSpace>>>())
-      .def(py::init([](py::list V) {
-        std::vector<std::shared_ptr<const dolfin::function::FunctionSpace>> _V;
-        for (auto space : V)
-        {
-          auto _space = space.attr("_cpp_object")
-                            .cast<std::shared_ptr<
-                                const dolfin::function::FunctionSpace>>();
-          _V.push_back(_space);
-        }
-        return dolfin::fem::PETScDMCollection(_V);
-      }))
       .def_static("create_transfer_matrix",
                   &dolfin::fem::PETScDMCollection::create_transfer_matrix)
-      .def_static(
-          "create_transfer_matrix",
-          [](py::object V_coarse, py::object V_fine) {
-            auto _V0 = V_coarse.attr("_cpp_object")
-                           .cast<dolfin::function::FunctionSpace*>();
-            auto _V1 = V_fine.attr("_cpp_object")
-                           .cast<dolfin::function::FunctionSpace*>();
-            return dolfin::fem::PETScDMCollection::create_transfer_matrix(*_V0,
-                                                                          *_V1);
-          })
       .def("check_ref_count", &dolfin::fem::PETScDMCollection::check_ref_count)
       .def("get_dm", &dolfin::fem::PETScDMCollection::get_dm);
 }

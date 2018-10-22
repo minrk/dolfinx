@@ -1393,7 +1393,7 @@ void XDMFFile::add_function(MPI_Comm mpi_comm, pugi::xml_node& xml_node,
   const std::size_t n_cells = mesh.topology().ghost_offset(tdim);
   x_cell_dofs.reserve(n_cells);
 
-  std::vector<std::size_t> local_to_global_map
+  Eigen::Array<std::size_t, Eigen::Dynamic, 1> local_to_global_map
       = dofmap.tabulate_local_to_global_dofs();
 
   // Add number of dofs for each cell
@@ -1693,9 +1693,9 @@ XDMFFile::read_checkpoint(std::shared_ptr<const function::FunctionSpace> V,
       {{cell_range[0], cell_range[1] + 1}});
 
   // Read cell dofmaps
-  std::vector<PetscInt> cell_dofs = get_dataset<PetscInt>(
-      _mpi_comm.comm(), cell_dofs_dataitem, parent_path,
-      {{x_cell_dofs.front(), x_cell_dofs.back()}});
+  std::vector<PetscInt> cell_dofs
+      = get_dataset<PetscInt>(_mpi_comm.comm(), cell_dofs_dataitem, parent_path,
+                              {{x_cell_dofs.front(), x_cell_dofs.back()}});
 
   const std::vector<std::int64_t> vector_shape
       = get_dataset_shape(vector_dataitem);
@@ -2101,7 +2101,7 @@ XDMFFile::get_cell_type(const pugi::xml_node& topology_node)
       {"polyvertex", {"point", 1}},    {"polyline", {"interval", 1}},
       {"edge_3", {"interval", 2}},     {"triangle", {"triangle", 1}},
       {"triangle_6", {"triangle", 2}}, {"tetrahedron", {"tetrahedron", 1}},
-      {"tet_10", {"tetrahedron", 2}},  {"quadrilateral", {"quadrilateral", 1}}};
+      {"tetrahedron_10", {"tetrahedron", 2}},  {"quadrilateral", {"quadrilateral", 1}}};
 
   // Convert XDMF cell type string to DOLFIN cell type string
   std::string cell_type = type_attr.as_string();
@@ -3065,7 +3065,7 @@ std::string XDMFFile::vtk_cell_type_str(mesh::CellType::Type cell_type,
     case 1:
       return "Quadrilateral";
     case 2:
-      return "Quad_8";
+      return "Quadrilateral_8";
     }
   case mesh::CellType::Type::tetrahedron:
     switch (order)
@@ -3073,7 +3073,7 @@ std::string XDMFFile::vtk_cell_type_str(mesh::CellType::Type cell_type,
     case 1:
       return "Tetrahedron";
     case 2:
-      return "Tet_10";
+      return "Tetrahedron_10";
     }
   case mesh::CellType::Type::hexahedron:
     switch (order)
@@ -3081,7 +3081,7 @@ std::string XDMFFile::vtk_cell_type_str(mesh::CellType::Type cell_type,
     case 1:
       return "Hexahedron";
     case 2:
-      return "Hex_20";
+      return "Hexahedron_20";
     }
   default:
     log::dolfin_error("XDMFFile.cpp", "output mesh topology",

@@ -1,28 +1,27 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2017 Chris N. Richardson and Garth N. Wells
+# Copyright (C) 2017-2018 Chris N. Richardson and Garth N. Wells
 #
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from dolfin import pkgconfig
-import numpy
+import functools
 import hashlib
+
+import numpy
+
 import dijitso
+import dolfin.pkgconfig
 import ffc
-
-import dolfin.cpp as cpp
-from dolfin.cpp import MPI
-from functools import wraps
-from dolfin.parameter import parameters
-
+from dolfin import cpp, parameter
 
 # Get DOLFIN pkg-config data
-if pkgconfig.exists("dolfin"):
-    dolfin_pc = pkgconfig.parse("dolfin")
+if dolfin.pkgconfig.exists("dolfin"):
+    dolfin_pc = dolfin.pkgconfig.parse("dolfin")
 else:
     raise RuntimeError(
-        "Could not find DOLFIN pkg-config file. Please make sure appropriate paths are set.")
+        "Could not find DOLFIN pkg-config file. Make sure appropriate paths are set."
+    )
 
 
 # Copied over from site-packages
@@ -42,22 +41,23 @@ def mpi_jit_decorator(local_jit, *args, **kwargs):
                 ....
 
     """
-    @wraps(local_jit)
+
+    @functools.wraps(local_jit)
     def mpi_jit(*args, **kwargs):
 
         # FIXME: should require mpi_comm to be explicit
         # and not default to comm_world?
-        mpi_comm = kwargs.pop("mpi_comm", MPI.comm_world)
+        mpi_comm = kwargs.pop("mpi_comm", cpp.MPI.comm_world)
 
         # Just call JIT compiler when running in serial
-        if MPI.size(mpi_comm) == 1:
+        if cpp.MPI.size(mpi_comm) == 1:
             return local_jit(*args, **kwargs)
 
         # Default status (0 == ok, 1 == fail)
         status = 0
 
         # Compile first on process 0
-        root = MPI.rank(mpi_comm) == 0
+        root = cpp.MPI.rank(mpi_comm) == 0
         if root:
             try:
                 output = local_jit(*args, **kwargs)
@@ -74,7 +74,7 @@ def mpi_jit_decorator(local_jit, *args, **kwargs):
 
         # Wait for the compiling process to finish and get status
         # TODO: Would be better to broadcast the status from root but this works.
-        global_status = MPI.max(mpi_comm, status)
+        global_status = cpp.MPI.max(mpi_comm, status)
 
         if global_status == 0:
             # Success, call jit on all other processes
@@ -101,7 +101,7 @@ def ffc_jit(ufl_form, form_compiler_parameters=None):
 
     # Prepare form compiler parameters with overrides from dolfin and kwargs
     p = ffc.default_jit_parameters()
-    p.update(dict(parameters["form_compiler"]))
+    p.update(dict(parameter.parameters["form_compiler"]))
     p.update(form_compiler_parameters or {})
     return ffc.jit(ufl_form, parameters=p)
 
@@ -114,10 +114,31 @@ def dijitso_jit(*args, **kwargs):
 
 _cpp_math_builtins = [
     # <cmath> functions: from http://www.cplusplus.com/reference/cmath/
-    "cos", "sin", "tan", "acos", "asin", "atan", "atan2",
-    "cosh", "sinh", "tanh", "exp", "frexp", "ldexp", "log", "log10", "modf",
-    "pow", "sqrt", "ceil", "fabs", "floor", "fmod",
-    "max", "min"]
+    "cos",
+    "sin",
+    "tan",
+    "acos",
+    "asin",
+    "atan",
+    "atan2",
+    "cosh",
+    "sinh",
+    "tanh",
+    "exp",
+    "frexp",
+    "ldexp",
+    "log",
+    "log10",
+    "modf",
+    "pow",
+    "sqrt",
+    "ceil",
+    "fabs",
+    "floor",
+    "fmod",
+    "max",
+    "min"
+]
 
 _math_header = """
 // cmath functions
@@ -165,7 +186,8 @@ def compile_class(cpp_data):
     property_str = ''
     for k, v in properties.items():
         property_str += str(k)
-        if hasattr(v, '_cpp_object') and isinstance(v._cpp_object, cpp.function.GenericFunction):
+        if hasattr(v, '_cpp_object') and isinstance(
+                v._cpp_object, cpp.function.GenericFunction):
             property_str += '*'
 
     hash_str = str(statements) + str(property_str) + cpp.__version__
@@ -173,10 +195,10 @@ def compile_class(cpp_data):
     module_name = "dolfin_" + name + "_" + module_hash
 
     try:
-        module, signature = dijitso_jit(cpp_data, module_name, params,
-                                        generate=cpp_data['jit_generate'])
-        submodule = dijitso.extract_factory_function(
-            module, "create_" + module_name)()
+        module, signature = dijitso_jit(
+            cpp_data, module_name, params, generate=cpp_data['jit_generate'])
+        submodule = dijitso.extract_factory_function(module,
+                                                     "create_" + module_name)()
     except Exception:
         raise RuntimeError("Unable to compile C++ code with dijitso")
 
@@ -184,7 +206,7 @@ def compile_class(cpp_data):
 
     # Set properties to initial values
     # FIXME: maybe remove from here (do it in Expression instead)
-    for k, v in properties.items():
-        python_object.set_property(k, v)
+    for name, v in properties.items():
+        python_object.set_property(name, v)
 
     return python_object

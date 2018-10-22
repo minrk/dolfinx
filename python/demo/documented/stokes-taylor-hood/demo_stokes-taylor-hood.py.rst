@@ -115,12 +115,12 @@ equations. Now we can define boundary conditions::
     # No-slip boundary condition for velocity
     # x1 = 0, x1 = 1 and around the dolphin
     noslip = Constant((0, 0))
-    bc0 = DirichletBC(W.sub(0), noslip, sub_domains, 0)
+    bc0 = DirichletBC(W.sub(0), noslip, (sub_domains, 0))
 
     # Inflow boundary condition for velocity
     # x0 = 1
     inflow = Expression(("-sin(x[1]*pi)", "0.0"), degree=2)
-    bc1 = DirichletBC(W.sub(0), inflow, sub_domains, 1)
+    bc1 = DirichletBC(W.sub(0), inflow, (sub_domains, 1))
 
     # Collect boundary conditions
     bcs = [bc0, bc1]
@@ -163,9 +163,9 @@ a deep copy for further computations on the coefficient vectors::
     solve(a == L, w, bcs, petsc_options={"ksp_type": "preonly",
           "pc_type": "lu", "pc_factor_mat_solver_type": "mumps"})
 
-    # Split the mixed solution using deepcopy
-    # (needed for further computation on coefficient vector)
-    (u, p) = w.split(True)
+    # Split the mixed solution and collapse
+    u = w.sub(0).collapse()
+    p = w.sub(1).collapse()
 
 We can calculate the :math:`L^2` norms of u and p as follows::
 

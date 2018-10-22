@@ -6,8 +6,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 """Simpler interface for solving linear systems"""
 
-import dolfin.cpp as cpp
-from dolfin import MPI
+from dolfin import cpp
 
 
 def solve(A, x, b, method="default", preconditioner="default"):
@@ -28,34 +27,9 @@ def solve(A, x, b, method="default", preconditioner="default"):
     on which linear algebra backend is used and how that has been
     configured.
 
-    To list all available LU methods, run the following command:
-
-    .. code-block:: python
-
-        list_lu_solver_methods()
-
-    To list all available Krylov methods, run the following command:
-
-    .. code-block:: python
-
-        list_krylov_solver_methods()
-
-    To list all available preconditioners, run the following command:
-
-    .. code-block:: python
-
-        list_krylov_solver_preconditioners()
-
-    To list all available solver methods, including LU methods, Krylov
-    methods and, possibly, other methods, run the following command:
-
-    .. code-block:: python
-
-        list_linear_solver_methods()
-
     """
 
-    solver = cpp.la.PETScKrylovSolver(MPI.comm_world)
+    solver = cpp.la.PETScKrylovSolver(cpp.MPI.comm_world)
     solver.set_operator(A)
     solver.solve(x, b)
     return x

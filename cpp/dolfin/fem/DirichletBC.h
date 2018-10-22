@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 
 namespace dolfin
 {
@@ -134,18 +135,17 @@ public:
   ///         The function space.
   /// @param[in] g (GenericFunction)
   ///         The value.
-  /// @param[in] sub_domains (mesh::MeshFnunction<std::size_t>)
-  ///         Subdomain markers
-  /// @param[in] sub_domain (std::size_t)
-  ///         The subdomain index (number)
+  /// @param[in] sub_domains (std::pair<mesh::MeshFunction<std::size_t>, std::size_t)
+  ///         Subdomain marker
   /// @param[in] method (std::string)
   ///         Optional argument: A string specifying the
   ///         method to identify dofs.
-  DirichletBC(
-      std::shared_ptr<const function::FunctionSpace> V,
-      std::shared_ptr<const function::GenericFunction> g,
-      std::shared_ptr<const mesh::MeshFunction<std::size_t>> sub_domains,
-      std::size_t sub_domain, Method method = Method::topological);
+  DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
+              std::shared_ptr<const function::GenericFunction> g,
+              std::pair<std::shared_ptr<const mesh::MeshFunction<std::size_t>>,
+                        std::size_t>
+                  sub_domain,
+              Method method = Method::topological);
 
   /// Create boundary condition for subdomain by boundary markers
   /// (cells, local facet numbers)
@@ -247,6 +247,23 @@ public:
   ///         "geometric" or "pointwise").
   Method method() const;
 
+  // FIXME: What about ghost indices?
+  // FIXME: Consider return a reference and caching this data
+  /// Return array of indices with dofs applied. Indices are local to the
+  /// process
+  ///
+  /// @return Eigen::Array<PetscInt, Eigen::Dynamic, 1>
+  ///         Dof indices with boundary condition applied.
+  Eigen::Array<PetscInt, Eigen::Dynamic, 1> dof_indices() const;
+
+  // FIXME: What about ghost indices?
+  // FIXME: Consider return a reference and caching this data
+  /// Return array of indices and dof values. Indices are local to the
+  /// process
+  std::pair<Eigen::Array<PetscInt, Eigen::Dynamic, 1>,
+            Eigen::Array<PetscScalar, Eigen::Dynamic, 1>>
+  bcs() const;
+
 private:
   class LocalData;
 
@@ -317,9 +334,6 @@ private:
 
     // Coefficients
     std::vector<PetscScalar> w;
-
-    // mesh::Facet dofs
-    std::vector<int> facet_dofs;
 
     // Coordinates for dofs
     EigenRowArrayXXd coordinates;

@@ -125,7 +125,7 @@ public:
   virtual std::size_t num_entity_dofs(std::size_t entity_dim) const;
 
   /// Return the number of closure dofs for a given entity dimension
-  ///s
+  /// s
   /// @param     entity_dim (std::size_t)
   ///         Entity dimension
   ///
@@ -171,27 +171,27 @@ public:
 
   /// Tabulate local-local closure dofs on entity of cell
   ///
-  /// @param    element_dofs (std::size_t)
-  ///         Degrees of freedom on a single element.
   /// @param   entity_dim (std::size_t)
   ///         The entity dimension.
   /// @param    cell_entity_index (std::size_t)
   ///         The local entity index on the cell.
-  void tabulate_entity_closure_dofs(std::vector<int>& element_dofs,
-                                    std::size_t entity_dim,
-                                    std::size_t cell_entity_index) const;
+  /// @return     Eigen::Array<int, Eigen::Dynamic, 1>
+  ///         Degrees of freedom on a single element.
+  Eigen::Array<int, Eigen::Dynamic, 1>
+  tabulate_entity_closure_dofs(std::size_t entity_dim,
+                               std::size_t cell_entity_index) const;
 
   /// Tabulate local-local mapping of dofs on entity of cell
   ///
-  /// @param    element_dofs (std::size_t)
-  ///         Degrees of freedom on a single element.
   /// @param   entity_dim (std::size_t)
   ///         The entity dimension.
   /// @param    cell_entity_index (std::size_t)
   ///         The local entity index on the cell.
-  void tabulate_entity_dofs(std::vector<int>& element_dofs,
-                            std::size_t entity_dim,
-                            std::size_t cell_entity_index) const;
+  /// @return     Eigen::Array<int, Eigen::Dynamic, 1>
+  ///         Degrees of freedom on a single element.
+  Eigen::Array<int, Eigen::Dynamic, 1>
+  tabulate_entity_dofs(std::size_t entity_dim,
+                       std::size_t cell_entity_index) const;
 
   /// Tabulate globally supported dofs
   Eigen::Array<std::size_t, Eigen::Dynamic, 1> tabulate_global_dofs() const;
@@ -265,10 +265,6 @@ private:
 
   // UFC dof map
   std::shared_ptr<const ufc_dofmap> _ufc_dofmap;
-
-  // Map from UFC dof numbering to renumbered dof (ufc_dof ->
-  // actual_dof, both using local indices)
-  std::vector<int> _ufc_local_to_local;
 
   // Global dimension
   std::int64_t _global_dimension;
