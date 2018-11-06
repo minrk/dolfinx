@@ -36,6 +36,8 @@ steps:
     brew install pkg-config eigen open-mpi boost python3 bison flex
     brew install hdf5 --with-mpi
     export PETSC_DIR=/usr/local/petsc
+    pip3 install numpy
+    export CPATH=`python3 -c 'import numpy; print(numpy.get_include())'`
     pip3 install petsc4py
   displayName: Install Homebrew packages
 
