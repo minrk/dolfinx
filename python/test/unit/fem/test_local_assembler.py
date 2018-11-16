@@ -9,9 +9,9 @@
 import pytest
 import numpy
 from dolfin import (UnitIntervalMesh, UnitSquareMesh,
-                    Constant, Cell, TestFunction, TrialFunction, MPI, Cells, dx,
+                    Cell, TestFunction, TrialFunction, MPI, Cells, dx,
                     ds, dS, dot, Form, FunctionSpace, VectorFunctionSpace,
-                    Expression, FacetNormal)
+                    FacetNormal, SpatialCoordinate)
 from dolfin.fem.assembling import assemble_local
 
 
@@ -23,7 +23,7 @@ def test_local_assembler_1D():
     v = TestFunction(V)
     c = Cell(mesh, 0)
 
-    a_scalar = Constant(1) * dx(domain=mesh)
+    a_scalar = 1.0 * dx(domain=mesh)
     a_vector = v * dx
     a_matrix = u * v * dx
 
@@ -50,14 +50,12 @@ def test_local_assembler_1D():
 @pytest.mark.skip
 def test_local_assembler_on_facet_integrals():
     mesh = UnitSquareMesh(MPI.comm_world, 4, 4, 'right')
-    Vdg = FunctionSpace(mesh, 'DG', 0)
     Vdgt = FunctionSpace(mesh, 'DGT', 1)
 
     v = TestFunction(Vdgt)
+    x = SpatialCoordinate(mesh)
 
-    # Initialize DG function "w" in discontinuous pattern
-    w = Expression('(1.0 + pow(x[0], 2.2) + 1/(0.1 + pow(x[1], 3)))*300.0',
-                   element=Vdg.ufl_element())
+    w = (1.0 + x[0] ** 2.2 + 1. / (0.1 + x[1] ** 3)) * 300
 
     # Define form that tests that the correct + and - values are used
     L = w('-') * v('+') * dS

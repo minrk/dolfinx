@@ -13,13 +13,14 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 
 namespace dolfin
 {
 
 namespace function
 {
-class GenericFunction;
+class Function;
 class FunctionSpace;
 } // namespace function
 
@@ -115,7 +116,7 @@ public:
   ///
   /// @param[in] V (FunctionSpace)
   ///         The function space
-  /// @param[in] g (GenericFunction)
+  /// @param[in] g (Function)
   ///         The value
   /// @param[in] sub_domain (mesh::SubDomain)
   ///         The subdomain
@@ -124,7 +125,7 @@ public:
   ///         the method to identify dofs
   /// @param[in] check_midpoint (bool)
   DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
-              std::shared_ptr<const function::GenericFunction> g,
+              std::shared_ptr<const function::Function> g,
               std::shared_ptr<const mesh::SubDomain> sub_domain,
               Method method = Method::topological, bool check_midpoint = true);
 
@@ -132,27 +133,26 @@ public:
   ///
   /// @param[in] V (FunctionSpace)
   ///         The function space.
-  /// @param[in] g (GenericFunction)
+  /// @param[in] g (Function)
   ///         The value.
-  /// @param[in] sub_domains (mesh::MeshFnunction<std::size_t>)
-  ///         Subdomain markers
-  /// @param[in] sub_domain (std::size_t)
-  ///         The subdomain index (number)
+  /// @param[in] sub_domains (std::pair<mesh::MeshFunction<std::size_t>, std::size_t)
+  ///         Subdomain marker
   /// @param[in] method (std::string)
   ///         Optional argument: A string specifying the
   ///         method to identify dofs.
-  DirichletBC(
-      std::shared_ptr<const function::FunctionSpace> V,
-      std::shared_ptr<const function::GenericFunction> g,
-      std::shared_ptr<const mesh::MeshFunction<std::size_t>> sub_domains,
-      std::size_t sub_domain, Method method = Method::topological);
+  DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
+              std::shared_ptr<const function::Function> g,
+              std::pair<std::shared_ptr<const mesh::MeshFunction<std::size_t>>,
+                        std::size_t>
+                  sub_domain,
+              Method method = Method::topological);
 
   /// Create boundary condition for subdomain by boundary markers
   /// (cells, local facet numbers)
   ///
   /// @param[in] V (FunctionSpace)
   ///         The function space.
-  /// @param[in] g (GenericFunction)
+  /// @param[in] g (Function)
   ///         The value.
   /// @param[in] markers (std::vector<std:size_t>&)
   ///         Subdomain markers (facet index local to process)
@@ -160,7 +160,7 @@ public:
   ///         Optional argument: A string specifying the
   ///         method to identify dofs.
   DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
-              std::shared_ptr<const function::GenericFunction> g,
+              std::shared_ptr<const function::Function> g,
               const std::vector<std::size_t>& markers,
               Method method = Method::topological);
 
@@ -221,9 +221,9 @@ public:
 
   /// Return boundary value g
   ///
-  /// @return GenericFunction
+  /// @return Function
   ///         The boundary values.
-  std::shared_ptr<const function::GenericFunction> value() const;
+  std::shared_ptr<const function::Function> value() const;
 
   /// Return shared pointer to subdomain
   ///
@@ -235,10 +235,7 @@ public:
   ///
   /// @param[in] g (GenericFucntion)
   ///         The value.
-  void set_value(std::shared_ptr<const function::GenericFunction> g);
-
-  /// Set value to 0.0
-  void homogenize();
+  void set_value(std::shared_ptr<const function::Function> g);
 
   /// Return method used for computing Dirichlet dofs
   ///
@@ -246,6 +243,23 @@ public:
   ///         Method used for computing Dirichlet dofs ("topological",
   ///         "geometric" or "pointwise").
   Method method() const;
+
+  // FIXME: What about ghost indices?
+  // FIXME: Consider return a reference and caching this data
+  /// Return array of indices with dofs applied. Indices are local to the
+  /// process
+  ///
+  /// @return Eigen::Array<PetscInt, Eigen::Dynamic, 1>
+  ///         Dof indices with boundary condition applied.
+  Eigen::Array<PetscInt, Eigen::Dynamic, 1> dof_indices() const;
+
+  // FIXME: What about ghost indices?
+  // FIXME: Consider return a reference and caching this data
+  /// Return array of indices and dof values. Indices are local to the
+  /// process
+  std::pair<Eigen::Array<PetscInt, Eigen::Dynamic, 1>,
+            Eigen::Array<PetscScalar, Eigen::Dynamic, 1>>
+  bcs() const;
 
 private:
   class LocalData;
@@ -281,7 +295,7 @@ private:
   std::shared_ptr<const function::FunctionSpace> _function_space;
 
   // The function
-  std::shared_ptr<const function::GenericFunction> _g;
+  std::shared_ptr<const function::Function> _g;
 
   // Search method
   Method _method;
@@ -317,9 +331,6 @@ private:
 
     // Coefficients
     std::vector<PetscScalar> w;
-
-    // mesh::Facet dofs
-    std::vector<int> facet_dofs;
 
     // Coordinates for dofs
     EigenRowArrayXXd coordinates;

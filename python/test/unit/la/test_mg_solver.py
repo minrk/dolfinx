@@ -7,20 +7,22 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 
-from dolfin import (TestFunction, TrialFunction, dot, grad, dx,
-                    DirichletBC, UnitSquareMesh, UnitCubeMesh, inner, div, Expression,
-                    Constant, TestFunctions, TrialFunctions, DOLFIN_EPS, FunctionSpace,
-                    MixedElement, VectorElement, FiniteElement)
-from dolfin.la import PETScVector, PETScOptions, PETScKrylovSolver
+import numpy
+import pytest
+import ufl
+
+from dolfin import (DOLFIN_EPS, DirichletBC, Expression, Function,
+                    FiniteElement, FunctionSpace, MixedElement, TestFunction,
+                    TestFunctions, TrialFunction, TrialFunctions, UnitCubeMesh,
+                    UnitSquareMesh, VectorElement, div, dot, dx, grad, inner,
+                    interpolate)
+from dolfin import function
 from dolfin.cpp.fem import PETScDMCollection
 from dolfin.fem.assembling import assemble_system
-
-import pytest
-from dolfin_utils.test import skip_if_not_petsc4py
+from dolfin.la import PETScKrylovSolver, PETScOptions, PETScVector
 
 
 @pytest.mark.skip  # See https://bitbucket.org/fenics-project/dolfin/issues/938
-@skip_if_not_petsc4py
 def test_mg_solver_laplace():
 
     # Create meshes and function spaces
@@ -31,7 +33,8 @@ def test_mg_solver_laplace():
     u, v = TrialFunction(V[-1]), TestFunction(V[-1])
     a = dot(grad(u), grad(v)) * dx
     L = v * dx
-    bc = DirichletBC(V[-1], Constant(0.0), "on_boundary")
+    bc0 = Function(V[-1])
+    bc = DirichletBC(V[-1], bc0, "on_boundary")
     A, b = assemble_system(a, L, bc)
 
     # Create collection of PETSc DM objects
@@ -80,7 +83,6 @@ def test_mg_solver_laplace():
         opts.delValue(key)
 
 
-@skip_if_not_petsc4py
 def xtest_mg_solver_stokes():
 
     mesh0 = UnitCubeMesh(2, 2, 2)
@@ -94,6 +96,7 @@ def xtest_mg_solver_stokes():
     Z0 = FunctionSpace(mesh0, Ze)
     Z1 = FunctionSpace(mesh1, Ze)
     Z2 = FunctionSpace(mesh2, Ze)
+    V = FunctionSpace(mesh2, Ve)
     W = Z2
 
     # Boundaries
@@ -107,11 +110,17 @@ def xtest_mg_solver_stokes():
         return x[1] > 1.0 - DOLFIN_EPS or x[1] < DOLFIN_EPS
 
     # No-slip boundary condition for velocity
-    noslip = Constant((0.0, 0.0, 0.0))
+    noslip = Function(V)
     bc0 = DirichletBC(W.sub(0), noslip, top_bottom)
 
     # Inflow boundary condition for velocity
-    inflow = Expression(("-sin(x[1]*pi)", "0.0", "0.0"), degree=2)
+    @function.expression.numba_eval
+    def inflow_eval(values, x, cell_idx):
+        values[:, 0] = - numpy.sin(x[:, 1] * numpy.pi)
+        values[:, 1] = 0.0
+        values[:, 2] = 0.0
+
+    inflow = interpolate(Expression(inflow_eval, shape=(3,)), W.sub(0).collapse())
     bc1 = DirichletBC(W.sub(0), inflow, right)
 
     # Collect boundary conditions
@@ -120,7 +129,7 @@ def xtest_mg_solver_stokes():
     # Define variational problem
     (u, p) = TrialFunctions(W)
     (v, q) = TestFunctions(W)
-    f = Constant((0.0, 0.0, 0.0))
+    f = ufl.as_vector((0.0, 0.0, 0.0))
     a = inner(grad(u), grad(v)) * dx + div(v) * p * dx + q * div(u) * dx
     L = inner(f, v) * dx
 

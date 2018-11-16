@@ -6,7 +6,6 @@
 
 #include "FormCoefficients.h"
 #include <dolfin/fem/FiniteElement.h>
-#include <dolfin/function/GenericFunction.h>
 #include <dolfin/log/log.h>
 #include <memory>
 #include <string>
@@ -35,55 +34,24 @@ FormCoefficients::FormCoefficients(
     : _elements(coefficient_elements),
       _coefficients(coefficient_elements.size())
 {
+  // Do nothing
 }
 //-----------------------------------------------------------------------------
 std::size_t FormCoefficients::size() const { return _coefficients.size(); }
 //-----------------------------------------------------------------------------
 void FormCoefficients::set(
-    std::size_t i, std::shared_ptr<const function::GenericFunction> coefficient)
+    std::size_t i, std::shared_ptr<const function::Function> coefficient)
 {
   assert(i < _coefficients.size());
   _coefficients[i] = coefficient;
 
-  // FIXME: if GenericFunction has an element, check it matches
-
-  // Check value_rank and value_size of GenericFunction match those of
-  // FiniteElement i.
-
-  const std::size_t r = coefficient->value_rank();
-  const std::size_t fe_r = _elements[i].value_rank();
-  if (fe_r != r)
-  {
-    log::dolfin_error(
-        "FormCoefficients.h", "set coefficient",
-        "Invalid value rank for coefficient %d (got %d but expecting %d). "
-        "You might have forgotten to specify the value rank correctly in an "
-        "Expression subclass",
-        i, r, fe_r);
-  }
-
-  for (std::size_t j = 0; j < r; ++j)
-  {
-    const std::size_t dim = coefficient->value_dimension(j);
-    const std::size_t fe_dim = _elements[i].value_dimension(j);
-    if (dim != fe_dim)
-    {
-      log::dolfin_error(
-          "FormCoefficients.h", "set coefficient",
-          "Invalid value dimension %d for coefficient %d (got %d "
-          "but expecting %d). "
-          "You might have forgotten to specify the value dimension "
-          "correctly in an Expression subclass ",
-          j, i, dim, fe_dim);
-    }
-  }
+  // FIXME: if Function has an element, check it matches
 }
 //-----------------------------------------------------------------------------
-std::shared_ptr<const function::GenericFunction>
-FormCoefficients::get(std::size_t i) const
+const function::Function* FormCoefficients::get(std::size_t i) const
 {
   assert(i < _coefficients.size());
-  return _coefficients[i];
+  return _coefficients[i].get();
 }
 //-----------------------------------------------------------------------------
 const fem::FiniteElement& FormCoefficients::element(std::size_t i) const

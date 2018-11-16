@@ -16,10 +16,10 @@ namespace dolfin
 
 namespace la
 {
+class PETScKrylovSolver;
 class PETScMatrix;
 class PETScVector;
-class PETScKrylovSolver;
-}
+} // namespace la
 
 namespace nls
 {
@@ -50,21 +50,15 @@ public:
   /// @returns    std::pair<std::size_t, bool>
   ///         Pair of number of Newton iterations, and whether
   ///         iteration converged)
-  std::pair<std::size_t, bool> solve(NonlinearProblem& nonlinear_function,
-                                     la::PETScVector& x);
-
-  /// Return current Newton iteration number
-  ///
-  /// @returns     std::size_t
-  ///         The iteration number.
-  std::size_t iteration() const;
+  std::pair<int, bool> solve(NonlinearProblem& nonlinear_function,
+                             la::PETScVector& x);
 
   /// Return number of Krylov iterations elapsed since
   /// solve started
   ///
   /// @returns    std::size_t
   ///         The number of iterations.
-  std::size_t krylov_iterations() const;
+  int krylov_iterations() const;
 
   /// Return current residual
   ///
@@ -78,12 +72,6 @@ public:
   ///         Initial residual.
   double residual0() const;
 
-  /// Return current relative residual
-  ///
-  /// @returns double
-  ///       Current relative residual.
-  double relative_residual() const;
-
   /// Default parameter values
   ///
   /// @returns _Parameters_
@@ -96,16 +84,13 @@ public:
   ///
   /// @param relaxation_parameter (double)
   ///         Relaxation parameter value.
-  void set_relaxation_parameter(double relaxation_parameter)
-  {
-    _relaxation_parameter = relaxation_parameter;
-  }
+  void set_relaxation_parameter(double relaxation_parameter);
 
   /// Get relaxation parameter
   ///
   /// @returns    double
   ///         Relaxation parameter value.
-  double get_relaxation_parameter() { return _relaxation_parameter; }
+  double get_relaxation_parameter() const;
 
 protected:
   /// Convergence test. It may be overloaded using virtual inheritance and
@@ -123,25 +108,6 @@ protected:
   virtual bool converged(const la::PETScVector& r,
                          const NonlinearProblem& nonlinear_problem,
                          std::size_t iteration);
-
-  /// Setup solver to be used with system matrix A and preconditioner
-  /// matrix P. It may be overloaded to get finer control over linear
-  /// solver setup, various linesearch tricks, etc. Note that minimal
-  /// implementation should call *set_operators* method of the linear
-  /// solver.
-  ///
-  /// @param A (_std::shared_ptr<const PETScMatrix>_)
-  ///         System Jacobian matrix.
-  /// @param J (_std::shared_ptr<const PETSccMatrix>_)
-  ///         System preconditioner matrix.
-  /// @param nonlinear_problem (_NonlinearProblem_)
-  ///         The nonlinear problem.
-  /// @param iteration (std::size_t)
-  ///         Newton iteration number.
-  virtual void solver_setup(std::shared_ptr<const la::PETScMatrix> A,
-                            std::shared_ptr<const la::PETScMatrix> P,
-                            const NonlinearProblem& nonlinear_problem,
-                            std::size_t iteration);
 
   /// Update solution vector by computed Newton step. Default
   /// update is given by formula::
@@ -164,11 +130,8 @@ protected:
                                std::size_t iteration);
 
 private:
-  // Current number of Newton iterations
-  std::size_t _newton_iteration;
-
   // Accumulated number of Krylov iterations since solve began
-  std::size_t _krylov_iterations;
+  int _krylov_iterations;
 
   // Relaxation parameter
   double _relaxation_parameter;
@@ -179,20 +142,11 @@ private:
   // Solver
   std::shared_ptr<la::PETScKrylovSolver> _solver;
 
-  // Jacobian matrix
-  std::shared_ptr<la::PETScMatrix> _matA;
-
-  // Preconditioner matrix
-  std::shared_ptr<la::PETScMatrix> _matP;
-
   // Solution vector
-  std::shared_ptr<la::PETScVector> _dx;
-
-  // Residual vector
-  std::shared_ptr<la::PETScVector> _b;
+  std::unique_ptr<la::PETScVector> _dx;
 
   // MPI communicator
   dolfin::MPI::Comm _mpi_comm;
 };
-}
-}
+} // namespace nls
+} // namespace dolfin

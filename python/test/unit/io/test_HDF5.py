@@ -8,28 +8,24 @@ import os
 
 import dolfin
 from dolfin import (MPI, Cell, Expression, Function, FunctionSpace,
-                    MeshEntities, MeshEntity, MeshFunction, has_hdf5,
+                    MeshEntities, MeshEntity, MeshFunction,
                     MeshValueCollection, UnitCubeMesh, UnitSquareMesh, cpp)
+from dolfin import function
+from dolfin.io import HDF5File
 from dolfin.la import PETScVector
-from dolfin_utils.test import (skip_if_not_HDF5, tempdir, xfail_if_complex,
-                               xfail_with_serial_hdf5_in_parallel)
-if has_hdf5():
-    from dolfin.io import HDF5File
+from dolfin_utils.test.fixtures import tempdir
+from dolfin_utils.test.skips import xfail_if_complex
 
-assert(tempdir)
+assert (tempdir)
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_parallel(tempdir):
     filename = os.path.join(tempdir, "y.h5")
     hdf5 = HDF5File(MPI.comm_world, filename, "w")
-    assert(hdf5)
+    assert (hdf5)
 
 
 @xfail_if_complex
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_vector(tempdir):
     filename = os.path.join(tempdir, "x.h5")
     x = PETScVector(MPI.comm_world, [0, 305], [], 1)
@@ -39,8 +35,6 @@ def test_save_vector(tempdir):
 
 
 @xfail_if_complex
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_vector(tempdir):
     filename = os.path.join(tempdir, "vector.h5")
 
@@ -59,8 +53,6 @@ def test_save_and_read_vector(tempdir):
         assert x.norm(dolfin.cpp.la.Norm.l2) == 0.0
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_meshfunction_2D(tempdir):
     filename = os.path.join(tempdir, "meshfn-2d.h5")
 
@@ -87,8 +79,6 @@ def test_save_and_read_meshfunction_2D(tempdir):
                 assert meshfunctions[i][cell] == mf2[cell]
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_meshfunction_3D(tempdir):
     filename = os.path.join(tempdir, "meshfn-3d.h5")
 
@@ -111,14 +101,13 @@ def test_save_and_read_meshfunction_3D(tempdir):
     # Read back from file
     mf_file = HDF5File(mesh.mpi_comm(), filename, "r")
     for i in range(0, 4):
-        mf2 = mf_file.read_mf_double(mesh, "/meshfunction/group/%d/meshfun" % i)
+        mf2 = mf_file.read_mf_double(mesh,
+                                     "/meshfunction/group/%d/meshfun" % i)
         for cell in MeshEntities(mesh, i):
             assert meshfunctions[i][cell] == mf2[cell]
     mf_file.close()
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_mesh_value_collection(tempdir):
     ndiv = 2
     filename = os.path.join(tempdir, "mesh_value_collection.h5")
@@ -141,7 +130,8 @@ def test_save_and_read_mesh_value_collection(tempdir):
     # read from file
     with HDF5File(mesh.mpi_comm(), filename, 'r') as f:
         for dim in range(mesh.topology.dim):
-            mvc = f.read_mvc_size_t(mesh, "/mesh_value_collection_{}".format(dim))
+            mvc = f.read_mvc_size_t(mesh,
+                                    "/mesh_value_collection_{}".format(dim))
             # check the values
             for (cell, lidx), val in mvc.values().items():
                 eidx = Cell(mesh, cell).entities(dim)[lidx]
@@ -149,9 +139,8 @@ def test_save_and_read_mesh_value_collection(tempdir):
                 assert val == int(ndiv * sum(mid)) + 1
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
-def test_save_and_read_mesh_value_collection_with_only_one_marked_entity(tempdir):
+def test_save_and_read_mesh_value_collection_with_only_one_marked_entity(
+        tempdir):
     ndiv = 2
     filename = os.path.join(tempdir, "mesh_value_collection.h5")
     mesh = UnitCubeMesh(MPI.comm_world, ndiv, ndiv, ndiv)
@@ -173,16 +162,19 @@ def test_save_and_read_mesh_value_collection_with_only_one_marked_entity(tempdir
 
 
 @xfail_if_complex
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_function(tempdir):
     filename = os.path.join(tempdir, "function.h5")
 
     mesh = UnitSquareMesh(MPI.comm_world, 10, 10)
-    Q = FunctionSpace(mesh, "CG", 3)
+    Q = FunctionSpace(mesh, ("CG", 3))
     F0 = Function(Q)
     F1 = Function(Q)
-    E = Expression("x[0]", degree=1)
+
+    @function.expression.numba_eval
+    def expr_eval(values, x, cell_idx):
+        values[:, 0] = x[:, 0]
+
+    E = Expression(expr_eval)
     F0.interpolate(E)
 
     # Save to HDF5 File
@@ -199,8 +191,6 @@ def test_save_and_read_function(tempdir):
     hdf5_file.close()
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_mesh_2D(tempdir):
     filename = os.path.join(tempdir, "mesh2d.h5")
 
@@ -212,7 +202,8 @@ def test_save_and_read_mesh_2D(tempdir):
 
     # Read from file
     mesh_file = HDF5File(mesh0.mpi_comm(), filename, "r")
-    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False, cpp.mesh.GhostMode.none)
+    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False,
+                                cpp.mesh.GhostMode.none)
     mesh_file.close()
 
     assert mesh0.num_entities_global(0) == mesh1.num_entities_global(0)
@@ -220,8 +211,6 @@ def test_save_and_read_mesh_2D(tempdir):
     assert mesh0.num_entities_global(dim) == mesh1.num_entities_global(dim)
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_save_and_read_mesh_3D(tempdir):
     filename = os.path.join(tempdir, "mesh3d.h5")
 
@@ -233,7 +222,8 @@ def test_save_and_read_mesh_3D(tempdir):
 
     # Read from file
     mesh_file = HDF5File(mesh0.mpi_comm(), filename, "r")
-    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False, cpp.mesh.GhostMode.none)
+    mesh1 = mesh_file.read_mesh(MPI.comm_world, "/my_mesh", False,
+                                cpp.mesh.GhostMode.none)
     mesh_file.close()
 
     assert mesh0.num_entities_global(0) == mesh1.num_entities_global(0)
@@ -241,8 +231,6 @@ def test_save_and_read_mesh_3D(tempdir):
     assert mesh0.num_entities_global(dim) == mesh1.num_entities_global(dim)
 
 
-@skip_if_not_HDF5
-@xfail_with_serial_hdf5_in_parallel
 def test_mpi_atomicity(tempdir):
     comm_world = MPI.comm_world
     if MPI.size(comm_world) > 1:

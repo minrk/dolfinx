@@ -22,10 +22,10 @@ equation. In particular it demonstrates the use of
 Equation and problem definition
 -------------------------------
 
-The Cahn-Hilliard equation is a parabolic equation and is typically
-used to model phase separation in binary mixtures.  It involves
-first-order time derivatives, and second- and fourth-order spatial
-derivatives.  The equation reads:
+The Cahn-Hilliard equation is a parabolic equation and is typically used
+to model phase separation in binary mixtures.  It involves first-order
+time derivatives, and second- and fourth-order spatial derivatives.  The
+equation reads:
 
 .. math::
    \frac{\partial c}{\partial t} - \nabla \cdot M \left(\nabla\left(\frac{d f}{d c}
@@ -33,20 +33,20 @@ derivatives.  The equation reads:
    M\left(\nabla\left(\frac{d f}{d c} - \lambda \nabla^{2}c\right)\right) \cdot n &= 0 \quad {\rm on} \ \partial\Omega, \\
    M \lambda \nabla c \cdot n &= 0 \quad {\rm on} \ \partial\Omega.
 
-where :math:`c` is the unknown field, the function :math:`f` is
-usually non-convex in :math:`c` (a fourth-order polynomial is commonly
-used), :math:`n` is the outward directed boundary normal, and
-:math:`M` is a scalar parameter.
+where :math:`c` is the unknown field, the function :math:`f` is usually
+non-convex in :math:`c` (a fourth-order polynomial is commonly used),
+:math:`n` is the outward directed boundary normal, and :math:`M` is a
+scalar parameter.
 
 
 Mixed form
 ^^^^^^^^^^
 
-The Cahn-Hilliard equation is a fourth-order equation, so casting it
-in a weak form would result in the presence of second-order spatial
+The Cahn-Hilliard equation is a fourth-order equation, so casting it in
+a weak form would result in the presence of second-order spatial
 derivatives, and the problem could not be solved using a standard
-Lagrange finite element basis.  A solution is to rephrase the problem
-as two coupled second-order equations:
+Lagrange finite element basis.  A solution is to rephrase the problem as
+two coupled second-order equations:
 
 .. math::
    \frac{\partial c}{\partial t} - \nabla \cdot M \nabla\mu  &= 0 \quad {\rm in} \ \Omega, \\
@@ -108,33 +108,9 @@ First, the modules :py:mod:`random` :py:mod:`matplotlib`
 
     import random
     from dolfin import *
-
-.. index:: Expression
-
-A class which will be used to represent the initial conditions is then
-created::
-
-    # Class representing the intial conditions
-    class InitialConditions(UserExpression):
-        def __init__(self, **kwargs):
-            random.seed(2 + MPI.rank(MPI.comm_world))
-            super().__init__(**kwargs)
-        def eval(self, values, x):
-            values[0] = 0.63 + 0.02*(0.5 - random.random())
-            values[1] = 0.0
-        def value_shape(self):
-            return (2,)
-
-It is a subclass of :py:class:`Expression
-<dolfin.functions.expression.Expression>`. In the constructor
-(``__init__``), the random number generator is seeded. If the program
-is run in parallel, the random number generator is seeded using the
-rank (process number) to ensure a different sequence of numbers on
-each process.  The function ``eval`` returns values for a function of
-dimension two.  For the first component of the function, a randomized
-value is returned.  The method ``value_shape`` declares that the
-:py:class:`Expression <dolfin.functions.expression.Expression>` is
-vector valued with dimension two.
+    from dolfin import function
+    from dolfin.io import XDMFFile
+    from dolfin.fem.assemble import assemble
 
 .. index::
    single: NonlinearProblem; (in Cahn-Hilliard demo)
@@ -149,19 +125,30 @@ use in the Newton solver is now defined. It is a subclass of
             NonlinearProblem.__init__(self)
             self.L = L
             self.a = a
-        def F(self, b, x):
-            assemble(self.L, tensor=b)
-        def J(self, A, x):
-            assemble(self.a, tensor=A)
+            self._F = None
+            self._J = None
 
-The constructor (``__init__``) stores references to the bilinear
-(``a``) and linear (``L``) forms. These will used to compute the
-Jacobian matrix and the residual vector, respectively, for use in a
-Newton solver.  The function ``F`` and ``J`` are virtual member
-functions of :py:class:`NonlinearProblem
-<dolfin.cpp.NonlinearProblem>`. The function ``F`` computes the
-residual vector ``b``, and the function ``J`` computes the Jacobian
-matrix ``A``.
+        def F(self, x):
+            if self._F is None:
+                self._F = assemble(self.L)
+            else:
+                self._F = assemble(self._F, self.L)
+            return self._F
+
+        def J(self, x):
+            if self._J is None:
+                self._J = assemble(self.a)
+            else:
+                self._J = assemble(self._J, self.a)
+            return self._J
+
+The constructor (``__init__``) stores references to the bilinear (``a``)
+and linear (``L``) forms. These will used to compute the Jacobian matrix
+and the residual vector, respectively, for use in a Newton solver.  The
+function ``F`` and ``J`` are virtual member functions of
+:py:class:`NonlinearProblem <dolfin.cpp.NonlinearProblem>`. The function
+``F`` computes the residual vector ``b``, and the function ``J``
+computes the Jacobian matrix ``A``.
 
 Next, various model parameters are defined::
 
@@ -170,31 +157,13 @@ Next, various model parameters are defined::
     dt     = 5.0e-06  # time step
     theta  = 0.5      # time stepping family, e.g. theta=1 -> backward Euler, theta=0.5 -> Crank-Nicolson
 
-.. index::
-   singe: form compiler options; (in Cahn-Hilliard demo)
-
-It is possible to pass arguments that control aspects of the generated
-code to the form compiler. The lines ::
-
-    # Form compiler options
-    parameters["form_compiler"]["optimize"]     = True
-    parameters["form_compiler"]["cpp_optimize"] = True
-
-tell the form to apply optimization strategies in the code generation
-phase and the use compiler optimization flags when compiling the
-generated C++ code. Using the option ``["optimize"] = True`` will
-generally result in faster code (sometimes orders of magnitude faster
-for certain operations, depending on the equation), but it may take
-considerably longer to generate the code and the generation phase may
-use considerably more memory).
-
 A unit square mesh with 97 (= 96 + 1) vertices in each direction is
-created, and on this mesh a :py:class:`FunctionSpace
-<dolfin.functions.functionspace.FunctionSpace>` ``ME`` is built using
-a pair of linear Lagrangian elements. ::
+created, and on this mesh a
+:py:class:`FunctionSpace<dolfin.functions.functionspace.FunctionSpace>`
+``ME`` is built using a pair of linear Lagrangian elements. ::
 
     # Create mesh and build function space
-    mesh = UnitSquareMesh.create(96, 96, CellType.Type.quadrilateral)
+    mesh = UnitSquareMesh(MPI.comm_world, 96, 96, CellType.Type.quadrilateral)
     P1 = FiniteElement("Lagrange", mesh.ufl_cell(), 1)
     ME = FunctionSpace(mesh, P1*P1)
 
@@ -206,15 +175,15 @@ Trial and test functions of the space ``ME`` are now defined::
 
 .. index:: split functions
 
-For the test functions, :py:func:`TestFunctions
-<dolfin.functions.function.TestFunctions>` (note the 's' at the end)
-is used to define the scalar test functions ``q`` and ``v``. The
-:py:class:`TrialFunction <dolfin.functions.function.TrialFunction>`
+For the test functions,
+:py:func:`TestFunctions<dolfin.functions.function.TestFunctions>` (note
+the 's' at the end) is used to define the scalar test functions ``q``
+and ``v``. The
+:py:class:`TrialFunction<dolfin.functions.function.TrialFunction>`
 ``du`` has dimension two. Some mixed objects of the
-:py:class:`Function <dolfin.functions.function.Function>` class on
-``ME`` are defined to represent :math:`u = (c_{n+1}, \mu_{n+1})` and
-:math:`u0 = (c_{n}, \mu_{n})`, and these are then split into
-sub-functions::
+:py:class:`Function<dolfin.functions.function.Function>` class on ``ME``
+are defined to represent :math:`u = (c_{n+1}, \mu_{n+1})` and :math:`u0
+= (c_{n}, \mu_{n})`, and these are then split into sub-functions::
 
     # Define functions
     u   = Function(ME)  # current solution
@@ -225,21 +194,24 @@ sub-functions::
     c,  mu  = split(u)
     c0, mu0 = split(u0)
 
-The line ``c, mu = split(u)`` permits direct access to the components
-of a mixed function. Note that ``c`` and ``mu`` are references for
+The line ``c, mu = split(u)`` permits direct access to the components of
+a mixed function. Note that ``c`` and ``mu`` are references for
 components of ``u``, and not copies.
 
 .. index::
    single: interpolating functions; (in Cahn-Hilliard demo)
 
-Initial conditions are created by using the class defined at the
-beginning of the demo and then interpolating the initial conditions
-into a finite element space::
+Initial conditions are created by using the evaluate method
+then interpolated into a finite element space::
+
+    @function.expression.numba_eval
+    def init_cond(values, x, cell):
+        values[:, 0] = 0.63 + 0.02*(0.5 - random.random())
+        values[:, 1] = 0.0
 
     # Create intial conditions and interpolate
-    u_init = InitialConditions(degree=1)
+    u_init = Expression(init_cond, shape=(2,))
     u.interpolate(u_init)
-    u0.interpolate(u_init)
 
 The first line creates an object of type ``InitialConditions``.  The
 following two lines make ``u`` and ``u0`` interpolants of ``u_init``
@@ -257,11 +229,10 @@ differentiation::
     f    = 100*c**2*(1-c)**2
     dfdc = diff(f, c)
 
-The first line declares that ``c`` is a variable that some function
-can be differentiated with respect to. The next line is the function
-:math:`f` defined in the problem statement, and the third line
-performs the differentiation of ``f`` with respect to the variable
-``c``.
+The first line declares that ``c`` is a variable that some function can
+be differentiated with respect to. The next line is the function
+:math:`f` defined in the problem statement, and the third line performs
+the differentiation of ``f`` with respect to the variable ``c``.
 
 It is convenient to introduce an expression for :math:`\mu_{n+\theta}`::
 
@@ -271,15 +242,15 @@ It is convenient to introduce an expression for :math:`\mu_{n+\theta}`::
 which is then used in the definition of the variational forms::
 
     # Weak statement of the equations
-    L0 = c*q*dx - c0*q*dx + dt*dot(grad(mu_mid), grad(q))*dx
-    L1 = mu*v*dx - dfdc*v*dx - lmbda*dot(grad(c), grad(v))*dx
+    L0 = inner(c, q)*dx - inner(c0, q)*dx + dt*inner(grad(mu_mid), grad(q))*dx
+    L1 = inner(mu, v)*dx - inner(dfdc, v)*dx - lmbda*inner(grad(c), grad(v))*dx
     L = L0 + L1
 
-This is a statement of the time-discrete equations presented as part
-of the problem statement, using UFL syntax. The linear forms for the
-two equations can be summed into one form ``L``, and then the
-directional derivative of ``L`` can be computed to form the bilinear
-form which represents the Jacobian matrix::
+This is a statement of the time-discrete equations presented as part of
+the problem statement, using UFL syntax. The linear forms for the two
+equations can be summed into one form ``L``, and then the directional
+derivative of ``L`` can be computed to form the bilinear form which
+represents the Jacobian matrix::
 
     # Compute directional derivative about u in the direction of du (Jacobian)
     a = derivative(L, u, du)
@@ -287,19 +258,19 @@ form which represents the Jacobian matrix::
 .. index::
    single: Newton solver; (in Cahn-Hilliard demo)
 
-The DOLFIN Newton solver requires a :py:class:`NonlinearProblem
-<dolfin.cpp.NonlinearProblem>` object to solve a system of nonlinear
-equations. Here, we are using the class ``CahnHilliardEquation``,
-which was declared at the beginning of the file, and which is a
-sub-class of :py:class:`NonlinearProblem
-<dolfin.cpp.NonlinearProblem>`. We need to instantiate objects of both
-``CahnHilliardEquation`` and :py:class:`NewtonSolver
-<dolfin.cpp.NewtonSolver>`::
+The DOLFIN Newton solver requires a
+:py:class:`NonlinearProblem<dolfin.cpp.NonlinearProblem>` object to
+solve a system of nonlinear equations. Here, we are using the class
+``CahnHilliardEquation``, which was declared at the beginning of the
+file, and which is a sub-class of
+:py:class:`NonlinearProblem<dolfin.cpp.NonlinearProblem>`. We need to
+instantiate objects of both ``CahnHilliardEquation`` and
+:py:class:`NewtonSolver <dolfin.cpp.NewtonSolver>`::
 
     # Create nonlinear problem and Newton solver
     problem = CahnHilliardEquation(a, L)
-    solver = NewtonSolver()
-    solver.parameters["linear_solver"] = "lu"
+    solver = NewtonSolver(MPI.comm_world)
+    # solver.parameters["linear_solver"] = "lu"
     solver.parameters["convergence_criterion"] = "incremental"
     solver.parameters["relative_tolerance"] = 1e-6
 
@@ -311,28 +282,31 @@ check for convergence (the other possibility is to use ``"residual"``,
 or to provide a user-defined check). The tolerance for convergence is
 specified by ``parameters["relative_tolerance"] = 1e-6``.
 
-To run the solver and save the output to a VTK file for later visualization,
-the solver is advanced in time from :math:`t_{n}` to :math:`t_{n+1}` until
-a terminal time :math:`T` is reached::
+To run the solver and save the output to a VTK file for later
+visualization, the solver is advanced in time from :math:`t_{n}` to
+:math:`t_{n+1}` until a terminal time :math:`T` is reached::
 
     # Output file
-    file = File("output.pvd", "compressed")
+    file = XDMFFile(MPI.comm_world, "output.xdmf")
 
     # Step in time
     t = 0.0
     T = 50*dt
+    u.vector().vec().copy(result=u0.vector().vec())
+    u0.vector().update_ghosts()
     while (t < T):
         t += dt
-        u0.vector()[:] = u.vector()
         solver.solve(problem, u.vector())
-        file << (u.split()[0], t)
+        u.vector().vec().copy(result=u0.vector().vec())
+        file.write(u.sub(0), t)
 
 The string ``"compressed"`` indicates that the output data should be
 compressed to reduce the file size. Within the time stepping loop, the
 solution vector associated with ``u`` is copied to ``u0`` at the
 beginning of each time step, and the nonlinear problem is solved by
-calling :py:func:`solver.solve(problem, u.vector())
-<dolfin.cpp.NewtonSolver.solve>`, with the new solution vector
-returned in :py:func:`u.vector() <dolfin.cpp.Function.vector>`. The
-``c`` component of the solution (the first component of ``u``) is then
-written to file at every time step.
+calling
+:py:func:`solver.solve(problem,u.vector())<dolfin.cpp.NewtonSolver.solve>`,
+with the new solution vector returned in
+:py:func:`u.vector()<dolfin.cpp.Function.vector>`. The ``c`` component
+of the solution (the first component of ``u``) is then written to file
+at every time step.

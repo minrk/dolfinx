@@ -100,8 +100,7 @@ public:
        const Eigen::Ref<const EigenRowArrayXXd> points,
        const Eigen::Ref<const EigenRowArrayXXi64> cells,
        const std::vector<std::int64_t>& global_cell_indices,
-       const GhostMode ghost_mode,
-       std::uint32_t num_ghost_cells = 0);
+       const GhostMode ghost_mode, std::uint32_t num_ghost_cells = 0);
 
   /// Copy constructor.
   ///
@@ -163,7 +162,8 @@ public:
   /// @return std::vector<std::uint32_t>&
   ///         Connectivity for all cells.
   ///
-  const std::vector<std::int32_t>& cells() const
+  Eigen::Ref<const Eigen::Array<std::int32_t, Eigen::Dynamic, 1>>
+  cells() const
   {
     return _topology.connectivity(_topology.dim(), 0).connections();
   }

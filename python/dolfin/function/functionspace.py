@@ -1,151 +1,106 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2017 Chris N. Richardson and Garth N. Wells
+# Copyright (C) 2017-2018 Chris N. Richardson and Garth N. Wells
 #
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
+import typing
+
 import ufl
-import dolfin.cpp as cpp
-from dolfin.jit.jit import ffc_jit
+from dolfin import cpp, jit
+from dolfin.fem import dofmap
+
+
+class ElementMetaData(typing.NamedTuple):
+    """Data for representing a finite element"""
+    family: str
+    degree: int
+    form_degree: typing.Optional[int] = None  # noqa
 
 
 class FunctionSpace(ufl.FunctionSpace):
+    """A space on which Functions (fields) can be defined."""
 
-    def __init__(self, *args, **kwargs):
-        """Create finite element function space."""
+    def __init__(self,
+                 mesh: cpp.mesh.Mesh,
+                 element: typing.Union[ufl.FiniteElementBase, ElementMetaData],
+                 cppV: typing.Optional[cpp.function.FunctionSpace] = None):
+        """Create a finite element function space."""
 
-        if len(args) == 1:
-            # Do we relly want to do it this way? Can we get the
-            # sub-element from UFL?
-            self._init_from_cpp(*args, **kwargs)
+        # Create function space from a UFL element and existing cpp
+        # FunctionSpace
+        if cppV is not None:
+            assert mesh is None
+            ufl_domain = cppV.mesh().ufl_domain()
+            super().__init__(ufl_domain, element)
+            self._cpp_object = cppV
+            return
+
+        # Initialise the ufl.FunctionSpace
+        if isinstance(element, ufl.FiniteElementBase):
+            super().__init__(mesh.ufl_domain(), element)
         else:
-            if len(args) == 0 or not isinstance(args[0], cpp.mesh.Mesh):
-                # cpp.dolfin_error("functionspace.py",
-                #                  "create function space",
-                #                  "Illegal argument, not a mesh: "
-                #                  + str(args[0]))
-                pass
-            elif len(args) == 2:
-                self._init_from_ufl(*args, **kwargs)
-            else:
-                self._init_convenience(*args, **kwargs)
+            e = ElementMetaData(*element)
+            ufl_element = ufl.FiniteElement(
+                e.family, mesh.ufl_cell(), e.degree, form_degree=e.form_degree)
+            super().__init__(mesh.ufl_domain(), ufl_element)
 
-    def _init_from_ufl(self, mesh, element, constrained_domain=None):
-
-        # Initialize the ufl.FunctionSpace first to check for good
-        # meaning
-        ufl.FunctionSpace.__init__(self, mesh.ufl_domain(), element)
-
-        # Compile dofmap and element
-        ufc_element, ufc_dofmap = ffc_jit(element, form_compiler_parameters=None,
-                                          mpi_comm=mesh.mpi_comm())
-        ufc_element = cpp.fem.make_ufc_finite_element(ufc_element)
-
-        # Create DOLFIN element and dofmap
+        # Compile dofmap and element and create DOLFIN objects
+        ufc_element, ufc_dofmap = jit.ffc_jit(
+            self.ufl_element(),
+            form_compiler_parameters=None,
+            mpi_comm=mesh.mpi_comm())
+        ufc_element = dofmap.make_ufc_finite_element(ufc_element)
         dolfin_element = cpp.fem.FiniteElement(ufc_element)
-        ufc_dofmap = cpp.fem.make_ufc_dofmap(ufc_dofmap)
-        if constrained_domain is None:
-            dolfin_dofmap = cpp.fem.DofMap(ufc_dofmap, mesh)
-        else:
-            dolfin_dofmap = cpp.fem.DofMap(ufc_dofmap, mesh,
-                                           constrained_domain)
+        dolfin_dofmap = dofmap.DofMap.fromufc(ufc_dofmap, mesh)
 
         # Initialize the cpp.FunctionSpace
-        self._cpp_object = cpp.function.FunctionSpace(mesh,
-                                                      dolfin_element,
-                                                      dolfin_dofmap)
-
-    def _init_from_cpp(self, cppV, **kwargs):
-        """
-        if not isinstance(cppV, cpp.FunctionSpace):
-            cpp.dolfin_error("functionspace.py",
-                             "create function space",
-                             "Illegal argument for C++ function space, "
-                             "not a cpp.FunctionSpace: " + str(cppV))
-        # We don't want to support copy construction. This would
-        # indicate internal defficiency in the library
-        if isinstance(cppV, FunctionSpace):
-            cpp.dolfin_error("functionspace.py",
-                             "create function space",
-                             "Illegal argument for C++ function space, "
-                             "should not be functions.functionspace.FunctionSpace: " + str(cppV))
-        if len(kwargs) > 0:
-            cpp.dolfin_error("functionspace.py",
-                             "create function space",
-                             "Illegal arguments, did not expect C++ "
-                             "function space and **kwargs: " + str(kwargs))
-        """
-
-        # Reconstruct UFL element from signature
-        ufl_element = eval(cppV.element().signature(), ufl.__dict__)
-
-        # Get mesh
-        ufl_domain = cppV.mesh().ufl_domain()
-
-        # Initialize the ufl.FunctionSpace (not calling cpp.Function.__init__)
-        self._cpp_object = cppV
-
-        # Initialize the ufl.FunctionSpace
-        ufl.FunctionSpace.__init__(self, ufl_domain, ufl_element)
-
-    def _init_convenience(self, mesh, family, degree, form_degree=None,
-                          constrained_domain=None, restriction=None):
-
-        # Create UFL element
-        element = ufl.FiniteElement(family, mesh.ufl_cell(), degree,
-                                    form_degree=form_degree)
-
-        self._init_from_ufl(mesh, element, constrained_domain=constrained_domain)
+        self._cpp_object = cpp.function.FunctionSpace(
+            mesh, dolfin_element, dolfin_dofmap._cpp_object)
 
     def dolfin_element(self):
-        "Return the DOLFIN element."
+        """Return the DOLFIN element."""
         return self._cpp_object.element()
 
     def num_sub_spaces(self):
-        "Return the number of sub spaces"
+        """Return the number of sub spaces."""
         return self.dolfin_element().num_sub_elements()
 
-    def sub(self, i):
-        "Return the i-th sub space"
-        # FIXME: Should we have a more extensive check other than
-        # whats includeding the cpp code?
-        if not isinstance(i, int):
-            raise TypeError("expected an int for 'i'")
-        if self.num_sub_spaces() == 1:
-            raise ValueError("no SubSpaces to extract")
-        if i >= self.num_sub_spaces():
-            raise ValueError("Can only extract SubSpaces with i = 0 ... %d" %
-                             (self.num_sub_spaces() - 1))
-        assert hasattr(self.ufl_element(), "sub_elements")
-
-        # Extend with the python layer
-        return FunctionSpace(cpp.function.FunctionSpace.sub(self._cpp_object, [i]))
+    def sub(self, i: int):
+        """Return the i-th sub space."""
+        assert self.ufl_element().num_sub_elements() > i
+        sub_element = self.ufl_element().sub_elements()[i]
+        cppV_sub = self._cpp_object.sub([i])
+        return FunctionSpace(None, sub_element, cppV_sub)
 
     def component(self):
+        """Return the component relative to the parent space."""
         return self._cpp_object.component()
 
     def contains(self, V):
-        "Check whether a function is in the FunctionSpace"
+        """Check whether a function is in the FunctionSpace."""
         return self._cpp_object.contains(V._cpp_object)
 
     def __contains__(self, u):
-        "Check whether a function is in the FunctionSpace"
+        """Check whether a function is in the FunctionSpace."""
         try:
             return u._in(self._cpp_object)
         except AttributeError:
             try:
                 return u._cpp_object._in(self._cpp_object)
             except Exception as e:
-                raise RuntimeError("Unable to check if object is in FunctionSpace ({})".format(e))
+                raise RuntimeError(
+                    "Unable to check if object is in FunctionSpace ({})".
+                    format(e))
 
     def __eq__(self, other):
-        "Comparison for equality."
-        return ufl.FunctionSpace.__eq__(self, other) and self._cpp_object == other._cpp_object
+        """Comparison for equality."""
+        return super().__eq__(other) and self._cpp_object == other._cpp_object
 
     def __ne__(self, other):
-        "Comparison for inequality."
-        return ufl.FunctionSpace.__ne__(self, other) or self._cpp_object != other._cpp_object
+        """Comparison for inequality."""
+        return super().__ne__(other) or self._cpp_object != other._cpp_object
 
     def ufl_cell(self):
         return self._cpp_object.mesh().ufl_cell()
@@ -162,21 +117,23 @@ class FunctionSpace(ufl.FunctionSpace):
     def element(self):
         return self._cpp_object.element()
 
-    def dofmap(self):
-        return self._cpp_object.dofmap()
+    def dofmap(self) -> dofmap.DofMap:
+        """Return the degree-of-freedom map associated with the function space."""
+        return dofmap.DofMap(self._cpp_object.dofmap())
 
     def mesh(self):
+        """Return the mesh on which the function space is defined."""
         return self._cpp_object.mesh()
 
     def set_x(self, basis, x, component):
         return self._cpp_object.set_x(basis, x, component)
 
-    def collapse(self, collapsed_dofs=False):
+    def collapse(self, collapsed_dofs: bool = False):
         """Collapse a subspace and return a new function space and a map from
-        new to old dofs
+        new to old dofs.
 
         *Arguments*
-            collapsed_dofs (bool)
+            collapsed_dofs
                 Return the map from new to old dofs
 
        *Returns*
@@ -186,44 +143,41 @@ class FunctionSpace(ufl.FunctionSpace):
                 The map from new to old dofs (optional)
 
         """
-        # Get the cpp version of the FunctionSpace
         cpp_space, dofs = self._cpp_object.collapse()
-
-        # Extend with the python layer
-        V = FunctionSpace(cpp_space)
-
+        V = FunctionSpace(None, self.ufl_element(), cpp_space)
         if collapsed_dofs:
             return V, dofs
         else:
             return V
 
-    def extract_sub_space(self, component):
-        V = self._cpp_object.extract_sub_space(component)
-        return FunctionSpace(V)
-
     def tabulate_dof_coordinates(self):
         return self._cpp_object.tabulate_dof_coordinates()
 
 
-def VectorFunctionSpace(mesh, family, degree, dim=None, form_degree=None,
-                        constrained_domain=None, restriction=None):
-    """Create finite element function space."""
+def VectorFunctionSpace(mesh: cpp.mesh.Mesh,
+                        element: ElementMetaData,
+                        dim=None,
+                        restriction=None):
+    """Create vector finite element (composition of scalar elements) function space."""
 
-    # Create UFL element
-    element = ufl.VectorElement(family, mesh.ufl_cell(), degree,
-                                form_degree=form_degree, dim=dim)
+    e = ElementMetaData(*element)
+    ufl_element = ufl.VectorElement(
+        e.family,
+        mesh.ufl_cell(),
+        e.degree,
+        form_degree=e.form_degree,
+        dim=dim)
+    return FunctionSpace(mesh, ufl_element)
 
-    # Return (Py)DOLFIN FunctionSpace
-    return FunctionSpace(mesh, element, constrained_domain=constrained_domain)
 
+def TensorFunctionSpace(mesh: cpp.mesh.Mesh,
+                        element: ElementMetaData,
+                        shape=None,
+                        symmetry: bool = None,
+                        restriction=None):
+    """Create tensor finite element (composition of scalar elements) function space."""
 
-def TensorFunctionSpace(mesh, family, degree, shape=None, symmetry=None,
-                        constrained_domain=None, restriction=None):
-    """Create finite element function space."""
-
-    # Create UFL element
-    element = ufl.TensorElement(family, mesh.ufl_cell(), degree,
-                                shape, symmetry)
-
-    # Return (Py)DOLFIN FunctionSpace
-    return FunctionSpace(mesh, element, constrained_domain=constrained_domain)
+    e = ElementMetaData(*element)
+    ufl_element = ufl.TensorElement(e.family, mesh.ufl_cell(), e.degree, shape,
+                                    symmetry)
+    return FunctionSpace(mesh, ufl_element)

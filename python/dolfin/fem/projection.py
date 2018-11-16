@@ -12,22 +12,14 @@ finite element space.
 """
 
 import ufl
-import dolfin.cpp as cpp
-import dolfin
-from dolfin.function.argument import TestFunction, TrialFunction
-from dolfin.function.function import Function
-from dolfin.fem.assembling import assemble_system
-from dolfin.function.functionspace import (FunctionSpace, VectorFunctionSpace,
-                                           TensorFunctionSpace)
-
-__all__ = ['project']
+from dolfin import cpp, fem, function, la
 
 
 def project(v,
             V=None,
             bcs=None,
             mesh=None,
-            function=None,
+            funct=None,
             solver_type="lu",
             preconditioner_type="default",
             form_compiler_parameters=None):
@@ -46,6 +38,8 @@ def project(v,
             <dolfin.functions.functionspace.FunctionSpace>`
         mesh
             Optional argument :py:class:`mesh <dolfin.cpp.Mesh>`.
+        funct
+            Target function where result is stored.
         solver_type
             see :py:func:`solve <dolfin.fem.solving.solve>` for options.
         preconditioner_type
@@ -72,9 +66,9 @@ def project(v,
     if V is None:
         # Create function space based on Expression element if trying
         # to project an Expression
-        if isinstance(v, dolfin.function.expression.Expression):
+        if isinstance(v, function.Expression):
             if mesh is not None and isinstance(mesh, cpp.mesh.Mesh):
-                V = FunctionSpace(mesh, v.ufl_element())
+                V = function.FunctionSpace(mesh, v.ufl_element())
             # else:
             #     cpp.dolfin_error("projection.py",
             #                      "perform projection",
@@ -91,21 +85,21 @@ def project(v,
     dx = ufl.dx(mesh)
 
     # Define variational problem for projection
-    w = TestFunction(V)
-    Pv = TrialFunction(V)
-    a = ufl.inner(w, Pv) * dx
-    L = ufl.inner(w, v) * dx
+    w = function.TestFunction(V)
+    Pv = function.TrialFunction(V)
+    a = ufl.inner(Pv, w) * dx
+    L = ufl.inner(v, w) * dx
 
     # Assemble linear system
-    A, b = assemble_system(
+    A, b = fem.assemble_system(
         a, L, bcs=bcs, form_compiler_parameters=form_compiler_parameters)
 
     # Solve linear system for projection
-    if function is None:
-        function = Function(V)
-    dolfin.la.solver.solve(A, function.vector(), b, solver_type, preconditioner_type)
+    if funct is None:
+        funct = function.Function(V)
+    la.solve(A, funct.vector(), b, solver_type, preconditioner_type)
 
-    return function
+    return funct
 
 
 def _extract_function_space(expression, mesh):
@@ -127,7 +121,7 @@ def _extract_function_space(expression, mesh):
         # Extract functions
         functions = ufl.algorithms.extract_coefficients(expression)
         for f in functions:
-            if isinstance(f, Function):
+            if isinstance(f, function.Function):
                 mesh = f.function_space().mesh()
                 if mesh is not None:
                     break
@@ -139,11 +133,11 @@ def _extract_function_space(expression, mesh):
     # Create function space
     shape = expression.ufl_shape
     if shape == ():
-        V = FunctionSpace(mesh, "Lagrange", 1)
+        V = function.FunctionSpace(mesh, ("Lagrange", 1))
     elif len(shape) == 1:
-        V = VectorFunctionSpace(mesh, "Lagrange", 1, dim=shape[0])
+        V = function.VectorFunctionSpace(mesh, ("Lagrange", 1), dim=shape[0])
     elif len(shape) == 2:
-        V = TensorFunctionSpace(mesh, "Lagrange", 1, shape=shape)
+        V = function.TensorFunctionSpace(mesh, ("Lagrange", 1), shape=shape)
     else:
         raise RuntimeError("Unhandled rank, shape is {}.".format((shape, )))
 

@@ -6,9 +6,9 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 """IO module for input data, post-processing and checkpointing"""
 
-import dolfin.cpp as cpp
-import dolfin.fem
-from dolfin.function.function import Function
+from dolfin import cpp, fem, function
+
+__all__ = ["HDF5File", "XDMFFile"]
 
 
 class HDF5File:
@@ -87,7 +87,7 @@ class HDF5File:
                   use_partition_from_file: bool, ghost_mode):
         mesh = self._cpp_object.read_mesh(mpi_comm, data_path,
                                           use_partition_from_file, ghost_mode)
-        mesh.geometry.coord_mapping = dolfin.fem.create_coordinate_map(mesh)
+        mesh.geometry.coord_mapping = fem.create_coordinate_map(mesh)
         return mesh
 
     def read_function(self, V, name: str):
@@ -112,7 +112,7 @@ class HDF5File:
 
         V_cpp = getattr(V, "_cpp_object", V)
         u_cpp = self._cpp_object.read(V_cpp, name)
-        return Function(V, u_cpp.vector())
+        return function.Function(V, u_cpp.vector())
 
 
 class XDMFFile:
@@ -199,10 +199,11 @@ class XDMFFile:
 
     def read_mesh(self, mpi_comm, ghost_mode):
         mesh = self._cpp_object.read_mesh(mpi_comm, ghost_mode)
-        mesh.geometry.coord_mapping = dolfin.fem.create_coordinate_map(mesh)
+        mesh.geometry.coord_mapping = fem.create_coordinate_map(mesh)
         return mesh
 
-    def read_checkpoint(self, V, name: str, counter: int = -1) -> Function:
+    def read_checkpoint(self, V, name: str,
+                        counter: int = -1) -> function.Function:
         """Read finite element Function from checkpointing format
 
         Parameters
@@ -228,12 +229,9 @@ class XDMFFile:
 
         V_cpp = getattr(V, "_cpp_object", V)
         u_cpp = self._cpp_object.read_checkpoint(V_cpp, name, counter)
-        return Function(V, u_cpp.vector())
+        return function.Function(V, u_cpp.vector())
 
-    def write_checkpoint(self,
-                         u,
-                         name: str,
-                         time_step: float = 0.0) -> None:
+    def write_checkpoint(self, u, name: str, time_step: float = 0.0) -> None:
         """Write finite element Function in checkpointing format
 
         """

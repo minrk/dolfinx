@@ -9,7 +9,7 @@
 import pytest
 
 import ufl
-from dolfin import (MPI, Constant, Point, TestFunction, TrialFunction,
+from dolfin import (MPI, Point, TestFunction, TrialFunction, Function,
                     UnitCubeMesh, UnitSquareMesh, VectorFunctionSpace, fem, la)
 from dolfin.cpp.generation import BoxMesh
 from dolfin.cpp.mesh import CellType, GhostMode
@@ -88,7 +88,7 @@ def build_broken_elastic_nullspace(V):
 @pytest.mark.parametrize("degree", [1, 2])
 def test_nullspace_orthogonal(mesh, degree):
     """Test that null spaces orthogonalisation"""
-    V = VectorFunctionSpace(mesh, 'Lagrange', degree)
+    V = VectorFunctionSpace(mesh, ('Lagrange', degree))
     null_space = build_elastic_nullspace(V)
     assert not null_space.is_orthogonal()
     assert not null_space.is_orthonormal()
@@ -102,13 +102,14 @@ def test_nullspace_orthogonal(mesh, degree):
     UnitSquareMesh(MPI.comm_world, 12, 13),
     BoxMesh.create(
         MPI.comm_world,
-        [Point(0.8, -0.2, 1.2), Point(3.0, 11.0, -5.0)], [12, 18, 25],
+        [Point(0.8, -0.2, 1.2)._cpp_object,
+         Point(3.0, 11.0, -5.0)._cpp_object], [12, 18, 25],
         cell_type=CellType.Type.tetrahedron,
         ghost_mode=GhostMode.none),
 ])
 @pytest.mark.parametrize("degree", [1, 2])
 def test_nullspace_check(mesh, degree):
-    V = VectorFunctionSpace(mesh, 'Lagrange', degree)
+    V = VectorFunctionSpace(mesh, ('Lagrange', degree))
     u, v = TrialFunction(V), TestFunction(V)
 
     mesh.geometry.coord_mapping = fem.create_coordinate_map(mesh)
@@ -122,8 +123,8 @@ def test_nullspace_check(mesh, degree):
             grad(w)) * ufl.Identity(gdim)
 
     a = inner(sigma(u, mesh.geometry.dim), grad(v)) * dx
-    zero = mesh.geometry.dim * (0.0, )
-    L = inner(Constant(zero), v) * dx
+    zero = Function(V)
+    L = inner(zero, v) * dx
 
     # Assemble matrix and create compatible vector
     A, L = assembling.assemble_system(a, L, [])

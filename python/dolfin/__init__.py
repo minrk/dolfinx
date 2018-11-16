@@ -31,20 +31,20 @@ del sys
 # Import cpp modules
 from .cpp import __version__
 
-from .cpp.common import (Variable, has_debug, has_hdf5, has_scotch,
-                         has_hdf5_parallel, has_mpi4py, has_petsc_complex,
-                         has_petsc4py, has_parmetis, has_slepc, has_slepc4py,
-                         git_commit_hash, DOLFIN_EPS, DOLFIN_PI, TimingType,
-                         timing, timings, list_timings)
 
-from .cpp import MPI
-from .cpp.function import (Expression, Constant)
-from .cpp.fem import (FiniteElement, DofMap)
+from dolfin.common import (
+    has_debug, has_scotch, has_petsc_complex, has_parmetis, 
+    has_slepc, has_slepc4py, git_commit_hash, TimingType, 
+    timing, timings, list_timings, DOLFIN_EPS)
 
-from .cpp.geometry import BoundingBoxTree, Point
+import dolfin.MPI
+
+from dolfin.fem import DofMap
+from dolfin.geometry import BoundingBoxTree, Point
+
 from .cpp.generation import IntervalMesh, BoxMesh, RectangleMesh
 
-if has_slepc():
+if has_slepc:
     from .cpp.la import SLEPcEigenSolver
 
 from .cpp.mesh import (Mesh, MeshTopology, MeshGeometry, CellType, Cell, Facet,
@@ -53,10 +53,10 @@ from .cpp.mesh import (Mesh, MeshTopology, MeshGeometry, CellType, Cell, Facet,
                        FaceRange, EdgeRange, VertexRange, EntityRange,
                        SubDomain, MeshQuality, PeriodicBoundaryComputation)
 
-from .cpp.nls import (NonlinearProblem, NewtonSolver, OptimisationProblem)
+from .cpp.nls import (NonlinearProblem, NewtonSolver)
 
 from .fem.form import Form
-from .fem.dirichletbc import DirichletBC, AutoSubDomain
+from .fem.dirichletbc import DirichletBC
 from .fem.interpolation import interpolate
 from .fem.projection import project
 from .fem.solving import solve
@@ -67,17 +67,16 @@ from .function.functionspace import (FunctionSpace, VectorFunctionSpace,
 from .function.function import Function
 from .function.argument import (TestFunction, TrialFunction, TestFunctions,
                                 TrialFunctions)
-from .function.constant import Constant
 from .function.specialfunctions import (
-    MeshCoordinates, FacetArea, FacetNormal, CellVolume, SpatialCoordinate,
+    FacetNormal, CellVolume, SpatialCoordinate,
     CellNormal, CellDiameter, Circumradius, MinCellEdgeLength,
     MaxCellEdgeLength, MinFacetEdgeLength, MaxFacetEdgeLength)
-from .function.expression import Expression, UserExpression, CompiledExpression
+from .function.expression import Expression
 
 from .generation import UnitIntervalMesh, UnitSquareMesh, UnitCubeMesh
 
 # experimental
-from .jit.pybind11jit import compile_cpp_code
+from .pybind11jit import compile_cpp_code
 
 #from .la import la_index_dtype
 from .mesh import MeshFunction
@@ -96,4 +95,5 @@ from ufl import (
 from ufl.formoperators import action
 
 # Initialise PETSc
+from dolfin import cpp
 cpp.common.SubSystemsManager.init_petsc()

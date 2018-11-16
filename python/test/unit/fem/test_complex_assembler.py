@@ -5,14 +5,15 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 """Unit tests for assembly in complex mode"""
 
-import ufl
-import dolfin
 import numpy as np
 import pytest
+
+import dolfin
+import ufl
 from ufl import dx, grad, inner
 
-pytestmark = pytest.mark.skipif(not dolfin.has_petsc_complex(),
-                                reason="Only works in complex mode.")
+pytestmark = pytest.mark.skipif(
+    not dolfin.has_petsc_complex, reason="Only works in complex mode.")
 
 
 def test_complex_assembly():
@@ -25,43 +26,39 @@ def test_complex_assembly():
     u = dolfin.function.argument.TrialFunction(V)
     v = dolfin.function.argument.TestFunction(V)
 
-    g = dolfin.function.constant.Constant(-2 + 3.0j)
-    j = dolfin.function.constant.Constant(1.0j)
+    g = -2 + 3.0j
+    j = 1.0j
 
     a_real = inner(u, v) * dx
     L1 = inner(g, v) * dx
-    assembler = dolfin.fem.assembling.Assembler(a_real, L1)
-    A0, b0 = assembler.assemble()
-    bnorm = b0.norm(dolfin.cpp.la.Norm.l1)
+
+    bnorm = dolfin.fem.assemble(L1).norm(dolfin.cpp.la.Norm.l1)
     b_norm_ref = abs(-2 + 3.0j)
-    A0_norm = A0.norm(dolfin.cpp.la.Norm.frobenius)
     assert np.isclose(bnorm, b_norm_ref)
+    A0_norm = dolfin.fem.assemble(a_real).norm(dolfin.cpp.la.Norm.frobenius)
+
+    x = dolfin.SpatialCoordinate(mesh)
 
     a_imag = j * inner(u, v) * dx
-    f = dolfin.Expression("j*sin(2*pi*x[0])", degree=2)
+    f = 1j * ufl.sin(2 * np.pi * x[0])
     L0 = inner(f, v) * dx
-    assembler = dolfin.fem.assembling.Assembler(a_imag, L0)
-    A1, b1 = assembler.assemble()
-    b1_norm = b1.norm(dolfin.cpp.la.Norm.l2)
-    A1_norm = A1.norm(dolfin.cpp.la.Norm.frobenius)
+    A1_norm = dolfin.fem.assemble(a_imag).norm(dolfin.cpp.la.Norm.frobenius)
     assert np.isclose(A0_norm, A1_norm)
+    b1_norm = dolfin.fem.assemble(L0).norm(dolfin.cpp.la.Norm.l2)
 
     a_complex = (1 + j) * inner(u, v) * dx
-    f = dolfin.Expression("sin(2*pi*x[0])", degree=2)
+    f = ufl.sin(2 * np.pi * x[0])
     L2 = inner(f, v) * dx
-    assembler = dolfin.fem.assembling.Assembler(a_complex, L2)
-    A2, b2 = assembler.assemble()
-    b2_norm = b1.norm(dolfin.cpp.la.Norm.l2)
-    A2_norm = A2.norm(dolfin.cpp.la.Norm.frobenius)
-
+    A2_norm = dolfin.fem.assemble(a_complex).norm(dolfin.cpp.la.Norm.frobenius)
     assert np.isclose(A1_norm, A2_norm / np.sqrt(2))
+    b2_norm = dolfin.fem.assemble(L2).norm(dolfin.cpp.la.Norm.l2)
     assert np.isclose(b2_norm, b1_norm)
 
 
 def test_complex_assembly_solve():
-    """
-    Solve a positive definite helmholtz problem and verify solution
+    """Solve a positive definite helmholtz problem and verify solution
     with the method of manufactured solutions
+
     """
 
     degree = 3
@@ -69,22 +66,24 @@ def test_complex_assembly_solve():
     P = ufl.FiniteElement("Lagrange", mesh.ufl_cell(), degree)
     V = dolfin.function.functionspace.FunctionSpace(mesh, P)
 
+    x = dolfin.SpatialCoordinate(mesh)
+
     # Define source term
     A = 1 + 2 * (2 * np.pi)**2
-    f = dolfin.Expression("(1.+j)*A*cos(2*pi*x[0])*cos(2*pi*x[1])",
-                          degree=degree, A=A)
+    f = (1. + 1j) * A * ufl.cos(2 * np.pi * x[0]) * ufl.cos(2 * np.pi * x[1])
 
     # Variational problem
     u = dolfin.function.argument.TrialFunction(V)
     v = dolfin.function.argument.TestFunction(V)
-    C = dolfin.function.constant.Constant(1 + 1j)
-    a = C * inner(grad(u), grad(v)) * dx + \
-        C * inner(u, v) * dx
+    C = 1 + 1j
+    a = C * inner(grad(u), grad(v)) * dx + C * inner(u, v) * dx
     L = inner(f, v) * dx
 
-    # Create assembler and compute numerical soltion
-    assembler = dolfin.fem.assembling.Assembler(a, L)
-    A, b = assembler.assemble()
+    # Assemble
+    A = dolfin.fem.assemble(a)
+    b = dolfin.fem.assemble(L)
+
+    # Create solver
     solver = dolfin.cpp.la.PETScKrylovSolver(mesh.mpi_comm())
     dolfin.cpp.la.PETScOptions.set("ksp_type", "preonly")
     dolfin.cpp.la.PETScOptions.set("pc_type", "lu")
@@ -94,11 +93,11 @@ def test_complex_assembly_solve():
     solver.solve(x, b)
 
     # Reference Solution
-    ex = dolfin.Expression("cos(2*pi*x[0])*cos(2*pi*x[1])",
-                           degree=degree)
-    u_ref = dolfin.interpolate(ex, V)
+    @dolfin.function.expression.numba_eval
+    def ref_eval(values, x, cell_idx):
+        values[:, 0] = np.cos(2 * np.pi * x[:, 0]) * np.cos(2 * np.pi * x[:, 1])
+    u_ref = dolfin.interpolate(dolfin.Expression(ref_eval), V)
 
     xnorm = x.norm(dolfin.cpp.la.Norm.l2)
     x_ref_norm = u_ref.vector().norm(dolfin.cpp.la.Norm.l2)
-
     assert np.isclose(xnorm, x_ref_norm)

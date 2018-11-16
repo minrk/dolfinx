@@ -7,18 +7,17 @@
 
 import os
 import warnings
-import dolfin
-import dolfin.cpp as cpp
+
 import numpy as np
+
+from dolfin import cpp, fem, function
 
 __all__ = ["plot"]
 
-_meshfunction_types = (cpp.mesh.MeshFunctionBool,
-                       cpp.mesh.MeshFunctionInt,
-                       cpp.mesh.MeshFunctionDouble,
-                       cpp.mesh.MeshFunctionSizet)
-_matplotlib_plottable_types = (cpp.function.Function,
-                               cpp.function.Expression, cpp.mesh.Mesh,
+_meshfunction_types = (cpp.mesh.MeshFunctionBool, cpp.mesh.MeshFunctionInt,
+                       cpp.mesh.MeshFunctionDouble, cpp.mesh.MeshFunctionSizet)
+_matplotlib_plottable_types = (cpp.function.Function, cpp.function.Expression,
+                               cpp.mesh.Mesh,
                                cpp.fem.DirichletBC) + _meshfunction_types
 _all_plottable_types = tuple(set.union(set(_matplotlib_plottable_types)))
 
@@ -48,8 +47,8 @@ def mplot_mesh(ax, mesh, **kwargs):
         mplot_mesh(ax, bmesh, **kwargs)
     elif gdim == 3 and tdim == 2:
         xy = mesh.geometry.points
-        return ax.plot_trisurf(*[xy[:, i] for i in range(gdim)],
-                               triangles=mesh.cells(), **kwargs)
+        return ax.plot_trisurf(
+            *[xy[:, i] for i in range(gdim)], triangles=mesh.cells(), **kwargs)
     elif tdim == 1:
         x = [mesh.geometry.points[:, i] for i in range(gdim)]
         if gdim == 1:
@@ -65,11 +64,11 @@ def mplot_mesh(ax, mesh, **kwargs):
 def create_cg1_function_space(mesh, sh):
     r = len(sh)
     if r == 0:
-        V = dolfin.FunctionSpace(mesh, "CG", 1)
+        V = function.FunctionSpace(mesh, ("CG", 1))
     elif r == 1:
-        V = dolfin.VectorFunctionSpace(mesh, "CG", 1, dim=sh[0])
+        V = function.VectorFunctionSpace(mesh, ("CG", 1), dim=sh[0])
     else:
-        V = dolfin.TensorFunctionSpace(mesh, "CG", 1, shape=sh)
+        V = function.TensorFunctionSpace(mesh, ("CG", 1), shape=sh)
     return V
 
 
@@ -78,7 +77,7 @@ def mplot_expression(ax, f, mesh, **kwargs):
     # restructuring mplot_function a bit so it can handle Expression
     # natively
     V = create_cg1_function_space(mesh, f.value_shape)
-    g = dolfin.interpolate(f, V)
+    g = fem.interpolate(f, V)
     return mplot_function(ax, g, **kwargs)
 
 
@@ -97,19 +96,23 @@ def mplot_function(ax, f, **kwargs):
             fspace = fspace.collapse()
         except RuntimeError:
             return
-        fvec = dolfin.interpolate(f, fspace).vector()
+        fvec = fem.interpolate(f, fspace).vector()
 
     if fvec.size() == mesh.num_cells():
         # DG0 cellwise function
-        C = fvec.get_local()  # NB! Assuming here dof ordering matching cell numbering
+        C = fvec.get_local()
+        if (C.dtype.type is np.complex128):
+            warnings.warn("Plotting real part of complex data")
+            C = np.real(C)
+        # NB! Assuming here dof ordering matching cell numbering
         if gdim == 2 and tdim == 2:
             return ax.tripcolor(mesh2triang(mesh), C, **kwargs)
         elif gdim == 3 and tdim == 2:  # surface in 3d
             # FIXME: Not tested, probably broken
             xy = mesh.geometry.points
             shade = kwargs.pop("shade", True)
-            return ax.plot_trisurf(mesh2triang(mesh), xy[:, 2], C, shade=shade,
-                                   **kwargs)
+            return ax.plot_trisurf(
+                mesh2triang(mesh), xy[:, 2], C, shade=shade, **kwargs)
         elif gdim == 1 and tdim == 1:
             x = mesh.geometry.points[:, 0]
             nv = len(x)
@@ -126,27 +129,37 @@ def mplot_function(ax, f, **kwargs):
         # elif tdim == 1:  # FIXME: Plot embedded line
         else:
             raise AttributeError(
-                'Matplotlib plotting backend only supports 2D mesh for scalar functions.')
+                'Matplotlib plotting backend only supports 2D mesh for scalar functions.'
+            )
 
     elif f.value_rank() == 0:
         # Scalar function, interpolated to vertices
         # TODO: Handle DG1?
         C = f.compute_point_values(mesh)
+        if (C.dtype.type is np.complex128):
+            warnings.warn("Plotting real part of complex data")
+            C = np.real(C)
+
         if gdim == 2 and tdim == 2:
             mode = kwargs.pop("mode", "contourf")
             if mode == "contourf":
                 levels = kwargs.pop("levels", 40)
-                return ax.tricontourf(mesh2triang(mesh), C[:, 0], levels, **kwargs)
+                return ax.tricontourf(
+                    mesh2triang(mesh), C[:, 0], levels, **kwargs)
             elif mode == "color":
                 shading = kwargs.pop("shading", "gouraud")
-                return ax.tripcolor(mesh2triang(mesh), C[:, 0], shading=shading,
-                                    **kwargs)
+                return ax.tripcolor(
+                    mesh2triang(mesh), C[:, 0], shading=shading, **kwargs)
             elif mode == "warp":
                 from matplotlib import cm
                 cmap = kwargs.pop("cmap", cm.jet)
                 linewidths = kwargs.pop("linewidths", 0)
-                return ax.plot_trisurf(mesh2triang(mesh), C[:, 0], cmap=cmap,
-                                       linewidths=linewidths, **kwargs)
+                return ax.plot_trisurf(
+                    mesh2triang(mesh),
+                    C[:, 0],
+                    cmap=cmap,
+                    linewidths=linewidths,
+                    **kwargs)
             elif mode == "wireframe":
                 return ax.triplot(mesh2triang(mesh), **kwargs)
             elif mode == "contour":
@@ -155,7 +168,8 @@ def mplot_function(ax, f, **kwargs):
             # FIXME: Not tested
             from matplotlib import cm
             cmap = kwargs.pop("cmap", cm.jet)
-            return ax.plot_trisurf(mesh2triang(mesh), C[:, 0], cmap=cmap, **kwargs)
+            return ax.plot_trisurf(
+                mesh2triang(mesh), C[:, 0], cmap=cmap, **kwargs)
         elif gdim == 3 and tdim == 3:
             # Volume
             # TODO: Isosurfaces?
@@ -179,7 +193,8 @@ def mplot_function(ax, f, **kwargs):
         # elif tdim == 1: # FIXME: Plot embedded line
         else:
             raise AttributeError(
-                'Matplotlib plotting backend only supports 2D mesh for scalar functions.')
+                'Matplotlib plotting backend only supports 2D mesh for scalar functions.'
+            )
 
     elif f.value_rank() == 1:
         # Vector function, interpolated to vertices
@@ -217,7 +232,8 @@ def mplot_function(ax, f, **kwargs):
             else:
                 # Return gracefully to make regression test pass without vtk
                 warnings.warn(
-                    'Plotting does not support displacement for {} in {}}. Continuing without plot.'.format(tdim, gdim))
+                    'Plotting does not support displacement for {} in {}}. Continuing without plot.'.
+                    format(tdim, gdim))
                 return
 
 
@@ -228,8 +244,8 @@ def mplot_meshfunction(ax, obj, **kwargs):
     if tdim == 2 and d == 2:
         C = obj.array()
         triang = mesh2triang(mesh)
-        assert not kwargs.pop(
-            "facecolors", None), "Not expecting 'facecolors' in kwargs"
+        assert not kwargs.pop("facecolors",
+                              None), "Not expecting 'facecolors' in kwargs"
         return ax.tripcolor(triang, facecolors=C, **kwargs)
     else:
         # Return gracefully to make regression test pass without vtk
@@ -249,9 +265,13 @@ def _plot_matplotlib(obj, mesh, kwargs):
         return
 
     # Plotting is not working with all ufl cells
-    if mesh.ufl_cell().cellname() not in ['interval', 'triangle', 'tetrahedron']:
-        raise AttributeError(("Matplotlib plotting backend doesn't handle %s mesh.\n"
-                              "Possible options are saving the output to XDMF file.") % mesh.ufl_cell().cellname())
+    if mesh.ufl_cell().cellname() not in [
+            'interval', 'triangle', 'tetrahedron'
+    ]:
+        raise AttributeError(
+            ("Matplotlib plotting backend doesn't handle %s mesh.\n"
+             "Possible options are saving the output to XDMF file.") %
+            mesh.ufl_cell().cellname())
 
     # Avoid importing pyplot until used
     try:
@@ -261,7 +281,7 @@ def _plot_matplotlib(obj, mesh, kwargs):
         return
 
     gdim = mesh.geometry.dim
-    if gdim == 3 or kwargs.get("mode") in ("warp",):
+    if gdim == 3 or kwargs.get("mode") in ("warp", ):
         # Importing this toolkit has side effects enabling 3d support
         from mpl_toolkits.mplot3d import axes3d  # noqa
         # Enabling the 3d toolbox requires some additional arguments
@@ -368,8 +388,8 @@ def plot(object, *args, **kwargs):
         return
 
     # For dolfin.function.Function, extract cpp_object
-    if hasattr(object, "cpp_object"):
-        object = object.cpp_object()
+    if hasattr(object, "_cpp_object"):
+        object = object._cpp_object
 
     # Get mesh from explicit mesh kwarg, only positional arg, or via
     # object
@@ -396,7 +416,7 @@ def plot(object, *args, **kwargs):
 
     # Try to project if object is not a standard plottable type
     if not isinstance(object, _all_plottable_types):
-        from dolfin.fem.projection import project
+        from fem.projection import project
         try:
             cpp.log.info("Object cannot be plotted directly, projecting to "
                          "piecewise linears.")

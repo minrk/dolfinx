@@ -4,7 +4,6 @@
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-
 """Simple interface for solving variational problems
 
 A small Python layer on top of the C++ VariationalProblem/Solver classes
@@ -13,21 +12,9 @@ as well as the solve function.
 """
 
 import ufl
-import dolfin.cpp as cpp
-from dolfin.cpp.la import PETScVector, PETScMatrix, \
-    PETScKrylovSolver, PETScOptions
-from dolfin.cpp.fem import SystemAssembler
-from dolfin.function.function import Function
-from dolfin.fem.form import Form
-# import dolfin.fem.formmanipulations as formmanipulations
-import dolfin.la.solver
+from dolfin import cpp, fem, function
 
-# __all__ = ["NonlinearVariationalProblem",
-#            "NonlinearVariationalSolver",
-#            "solve"]
-
-
-# FIXME: The code is this file is outrageously convolute because one
+# FIXME: The code is this file is outrageously convoluted because one
 # function an do a number of unrelated operations, depending in the
 # arguments passed.
 
@@ -37,56 +24,12 @@ import dolfin.la.solver
 
 # Solve function handles both linear systems and variational problems
 def solve(*args, **kwargs):
-    """Solve linear system Ax = b or variational problem a == L or F == 0.
+    """Solve variational problem a == L or F == 0.
 
-    The DOLFIN solve() function can be used to solve either linear
-    systems or variational problems. The following list explains the
+    The following list explains the
     various ways in which the solve() function can be used.
 
-    *1. Solving linear systems*
-
-    A linear system Ax = b may be solved by calling solve(A, x, b),
-    where A is a matrix and x and b are vectors. Optional arguments
-    may be passed to specify the solver method and preconditioner.
-    Some examples are given below:
-
-    .. code-block:: python
-
-        solve(A, x, b)
-        solve(A, x, b, "lu")
-        solve(A, x, b, "gmres", "ilu")
-        solve(A, x, b, "cg", "hypre_amg")
-
-    Possible values for the solver method and preconditioner depend
-    on which linear algebra backend is used and how that has been
-    configured.
-
-    To list all available LU methods, run the following command:
-
-    .. code-block:: python
-
-        list_lu_solver_methods()
-
-    To list all available Krylov methods, run the following command:
-
-    .. code-block:: python
-
-        list_krylov_solver_methods()
-
-    To list all available preconditioners, run the following command:
-
-    .. code-block:: python
-
-        list_krylov_solver_preconditioners()
-
-    To list all available solver methods, including LU methods, Krylov
-    methods and, possibly, other methods, run the following command:
-
-    .. code-block:: python
-
-        list_linear_solver_methods()
-
-    *2. Solving linear variational problems*
+    *1. Solving linear variational problems*
 
     A linear variational problem a(u, v) = L(v) for all v may be
     solved by calling solve(a == L, u, ...), where a is a bilinear
@@ -110,7 +53,7 @@ def solve(*args, **kwargs):
 
         info(LinearVariationalSolver.default_parameters(), True)
 
-    *3. Solving nonlinear variational problems*
+    *2. Solving nonlinear variational problems*
 
     A nonlinear variational problem F(u; v) = 0 for all v may be
     solved by calling solve(F == 0, u, ...), where the residual F is a
@@ -163,20 +106,9 @@ def solve(*args, **kwargs):
 
     """
 
-    assert(len(args) > 0)
-
-    # Call variational problem solver if we get an equation (but not a
-    # tolerance)
-    if isinstance(args[0], ufl.classes.Equation):
-        _solve_varproblem(*args, **kwargs)
-
-    # Default case, just call the wrapped C++ solve function
-    else:
-        if kwargs:
-            raise RuntimeError(
-                "Not expecting keyword arguments when solving linear algebra problem.")
-
-        return dolfin.la.solver.solve(*args)
+    assert (len(args) > 0)
+    assert isinstance(args[0], ufl.classes.Equation)
+    return _solve_varproblem(*args, **kwargs)
 
 
 def _solve_varproblem(*args, **kwargs):
@@ -189,21 +121,21 @@ def _solve_varproblem(*args, **kwargs):
     # Solve linear variational problem
     if isinstance(eq.lhs, ufl.Form) and isinstance(eq.rhs, ufl.Form):
 
-        a = Form(eq.lhs, form_compiler_parameters=form_compiler_parameters)
-        L = Form(eq.rhs, form_compiler_parameters=form_compiler_parameters)
+        a = fem.Form(eq.lhs, form_compiler_parameters=form_compiler_parameters)
+        L = fem.Form(eq.rhs, form_compiler_parameters=form_compiler_parameters)
 
-        A = PETScMatrix()
-        b = PETScVector()
+        A = cpp.la.PETScMatrix()
+        b = cpp.la.PETScVector()
 
-        assembler = SystemAssembler(a, L, bcs)
+        assembler = cpp.fem.SystemAssembler(a._cpp_object, L._cpp_object, bcs)
         assembler.assemble(A, b)
 
-        comm = L.mesh().mpi_comm()
-        solver = PETScKrylovSolver(comm)
+        comm = L._cpp_object.mesh().mpi_comm()
+        solver = cpp.la.PETScKrylovSolver(comm)
 
         solver.set_options_prefix("dolfin_solve_")
         for k, v in petsc_options.items():
-            PETScOptions.set("dolfin_solve_" + k, v)
+            cpp.la.PETScOptions.set("dolfin_solve_" + k, v)
         solver.set_from_options()
 
         solver.set_operator(A)
@@ -236,20 +168,24 @@ def _extract_args(*args, **kwargs):
     "Common extraction of arguments for _solve_varproblem[_adaptive]"
 
     # Check for use of valid kwargs
-    valid_kwargs = ["bcs", "J", "tol", "M",
-                    "form_compiler_parameters", "petsc_options"]
+    valid_kwargs = [
+        "bcs", "J", "tol", "M", "form_compiler_parameters", "petsc_options"
+    ]
     for kwarg in kwargs.keys():
         if kwarg not in valid_kwargs:
-            raise RuntimeError("Illegal keyword argument \'{}\'.".format(kwarg))
+            raise RuntimeError(
+                "Illegal keyword argument \'{}\'.".format(kwarg))
 
     # Extract equation
     if not len(args) >= 2:
         raise RuntimeError(
-            "Missing arguments, expecting solve(lhs == rhs, u, bcs=bcs), where bcs is optional")
+            "Missing arguments, expecting solve(lhs == rhs, u, bcs=bcs), where bcs is optional"
+        )
 
     if len(args) > 3:
         raise RuntimeError(
-            "Too many arguments, expecting solve(lhs == rhs, u, bcs=bcs), where bcs is optional")
+            "Too many arguments, expecting solve(lhs == rhs, u, bcs=bcs), where bcs is optional"
+        )
 
     # Extract equation
     eq = _extract_eq(args[0])
@@ -269,19 +205,22 @@ def _extract_args(*args, **kwargs):
     J = kwargs.get("J", None)
     if J is not None and not isinstance(J, ufl.Form):
         raise RuntimeError(
-            "Solve variational problem. Expecting Jacobian J to be a UFL Form.")
+            "Solve variational problem. Expecting Jacobian J to be a UFL Form."
+        )
 
     # Extract tolerance
     tol = kwargs.get("tol", None)
     if tol is not None and not (isinstance(tol, (float, int)) and tol >= 0.0):
         raise RuntimeError(
-            "Solve variational problem. Expecting tolerance tol to be a non-negative number.")
+            "Solve variational problem. Expecting tolerance tol to be a non-negative number."
+        )
 
     # Extract functional
     M = kwargs.get("M", None)
     if M is not None and not isinstance(M, ufl.Form):
         raise RuntimeError(
-            "Solve variational problem. Expecting goal functional M to be a UFL Form.")
+            "Solve variational problem. Expecting goal functional M to be a UFL Form."
+        )
 
     # Extract parameters
     form_compiler_parameters = kwargs.get("form_compiler_parameters", {})
@@ -294,7 +233,8 @@ def _extract_eq(eq):
     "Extract and check argument eq"
     if not isinstance(eq, ufl.classes.Equation):
         raise RuntimeError(
-            "Solve variational problem. Expecting first argument to be an Equation.")
+            "Solve variational problem. Expecting first argument to be an Equation."
+        )
 
     return eq
 
@@ -306,7 +246,7 @@ def _extract_u(u):
     #
     # if isinstance(u, cpp.function.Function):
     #     return u
-    if isinstance(u, Function):
+    if isinstance(u, function.Function):
         return u
 
     raise RuntimeError("Expecting second argument to be a Function.")
@@ -325,6 +265,7 @@ def _extract_bcs(bcs):
     for bc in bcs:
         if not isinstance(bc, cpp.fem.DirichletBC):
             raise RuntimeError(
-                "solve variational problem. Unable to extract boundary condition arguments")
+                "solve variational problem. Unable to extract boundary condition arguments"
+            )
 
     return bcs

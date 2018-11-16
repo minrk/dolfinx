@@ -15,9 +15,8 @@
 #include <dolfin/common/Timer.h>
 #include <dolfin/common/constants.h>
 #include <dolfin/fem/CoordinateMapping.h>
-#include <dolfin/function/Constant.h>
 #include <dolfin/function/FunctionSpace.h>
-#include <dolfin/function/GenericFunction.h>
+#include <dolfin/function/Function.h>
 #include <dolfin/geometry/Point.h>
 #include <dolfin/log/log.h>
 #include <dolfin/mesh/Cell.h>
@@ -36,7 +35,7 @@ using namespace dolfin::fem;
 
 //-----------------------------------------------------------------------------
 DirichletBC::DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
-                         std::shared_ptr<const function::GenericFunction> g,
+                         std::shared_ptr<const function::Function> g,
                          std::shared_ptr<const mesh::SubDomain> sub_domain,
                          Method method, bool check_midpoint)
     : _function_space(V), _g(g), _method(method), _user_sub_domain(sub_domain),
@@ -47,18 +46,20 @@ DirichletBC::DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
 //-----------------------------------------------------------------------------
 DirichletBC::DirichletBC(
     std::shared_ptr<const function::FunctionSpace> V,
-    std::shared_ptr<const function::GenericFunction> g,
-    std::shared_ptr<const mesh::MeshFunction<std::size_t>> sub_domains,
-    std::size_t sub_domain, Method method)
+    std::shared_ptr<const function::Function> g,
+    std::pair<std::shared_ptr<const mesh::MeshFunction<std::size_t>>,
+              std::size_t>
+        sub_domain,
+    Method method)
     : _function_space(V), _g(g), _method(method), _num_dofs(0),
-      _user_mesh_function(sub_domains), _user_sub_domain_marker(sub_domain),
-      _check_midpoint(true)
+      _user_mesh_function(sub_domain.first),
+      _user_sub_domain_marker(sub_domain.second), _check_midpoint(true)
 {
   check();
 }
 //-----------------------------------------------------------------------------
 DirichletBC::DirichletBC(std::shared_ptr<const function::FunctionSpace> V,
-                         std::shared_ptr<const function::GenericFunction> g,
+                         std::shared_ptr<const function::Function> g,
                          const std::vector<std::size_t>& markers, Method method)
     : _function_space(V), _g(g), _method(method), _num_dofs(0),
       _facets(markers), _user_sub_domain_marker(0), _check_midpoint(true)
@@ -182,7 +183,7 @@ void DirichletBC::get_boundary_values(Map& boundary_values) const
 //-----------------------------------------------------------------------------
 const std::vector<std::size_t>& DirichletBC::markers() const { return _facets; }
 //-----------------------------------------------------------------------------
-std::shared_ptr<const function::GenericFunction> DirichletBC::value() const
+std::shared_ptr<const function::Function> DirichletBC::value() const
 {
   return _g;
 }
@@ -192,39 +193,60 @@ std::shared_ptr<const mesh::SubDomain> DirichletBC::user_sub_domain() const
   return _user_sub_domain;
 }
 //-----------------------------------------------------------------------------
-void DirichletBC::homogenize()
-{
-  const std::size_t value_rank = _g->value_rank();
-  if (!value_rank)
-  {
-    std::shared_ptr<function::Constant> zero(new function::Constant(0.0));
-    set_value(zero);
-  }
-  else if (value_rank == 1)
-  {
-    const std::size_t value_dim = _g->value_dimension(0);
-    std::vector<PetscScalar> values(value_dim, 0.0);
-    std::shared_ptr<function::Constant> zero(new function::Constant(values));
-    set_value(zero);
-  }
-  else
-  {
-    std::vector<std::size_t> value_shape;
-    for (std::size_t i = 0; i < value_rank; i++)
-      value_shape.push_back(_g->value_dimension(i));
-    std::vector<PetscScalar> values(_g->value_size(), 0.0);
-    std::shared_ptr<function::Constant> zero(
-        new function::Constant(value_shape, values));
-    set_value(zero);
-  }
-}
-//-----------------------------------------------------------------------------
-void DirichletBC::set_value(std::shared_ptr<const function::GenericFunction> g)
+void DirichletBC::set_value(std::shared_ptr<const function::Function> g)
 {
   _g = g;
 }
 //-----------------------------------------------------------------------------
 DirichletBC::Method DirichletBC::method() const { return _method; }
+//-----------------------------------------------------------------------------
+Eigen::Array<PetscInt, Eigen::Dynamic, 1> DirichletBC::dof_indices() const
+{
+  // FIXME: Optimise this operation, and consider caching
+  Map boundary_values;
+  get_boundary_values(boundary_values);
+
+  // FIXMEL Eliminate comm
+  assert(_function_space->mesh());
+  MPI_Comm mpi_comm = _function_space->mesh()->mpi_comm();
+  if (MPI::size(mpi_comm) > 1
+      and this->method() != DirichletBC::Method::pointwise)
+    this->gather(boundary_values);
+
+  Eigen::Array<PetscInt, Eigen::Dynamic, 1> dofs(boundary_values.size());
+  std::size_t i = 0;
+  for (auto& bc : boundary_values)
+    dofs[i++] = bc.first;
+
+  return dofs;
+}
+//-----------------------------------------------------------------------------
+std::pair<Eigen::Array<PetscInt, Eigen::Dynamic, 1>,
+          Eigen::Array<PetscScalar, Eigen::Dynamic, 1>>
+DirichletBC::bcs() const
+{
+  // FIXME: Optimise this operation, and consider caching
+  Map boundary_values;
+  get_boundary_values(boundary_values);
+
+  // FIXMEL Eliminate comm
+  assert(_function_space->mesh());
+  MPI_Comm mpi_comm = _function_space->mesh()->mpi_comm();
+  if (MPI::size(mpi_comm) > 1
+      and this->method() != DirichletBC::Method::pointwise)
+    this->gather(boundary_values);
+
+  Eigen::Array<PetscInt, Eigen::Dynamic, 1> indices(boundary_values.size());
+  Eigen::Array<PetscScalar, Eigen::Dynamic, 1> values(boundary_values.size());
+  std::size_t i = 0;
+  for (auto& bc : boundary_values)
+  {
+    indices[i] = bc.first;
+    values[i++] = bc.second;
+  }
+
+  return std::make_pair(std::move(indices), std::move(values));
+}
 //-----------------------------------------------------------------------------
 void DirichletBC::check() const
 {
@@ -390,6 +412,12 @@ void DirichletBC::compute_bc_topological(Map& boundary_values,
   boundary_values.reserve(boundary_values.size()
                           + _facets.size() * num_facet_dofs);
 
+  // Build local dofs for each facet
+  const mesh::CellType& cell_type = mesh.type();
+  std::vector<Eigen::Array<int, Eigen::Dynamic, 1>> facet_dofs;
+  for (std::size_t i = 0; i < cell_type.num_entities(D - 1); ++i)
+    facet_dofs.push_back(dofmap.tabulate_entity_closure_dofs(D - 1, i));
+
   // Iterate over marked
   assert(_function_space->element());
   for (std::size_t f = 0; f < _facets.size(); ++f)
@@ -397,7 +425,7 @@ void DirichletBC::compute_bc_topological(Map& boundary_values,
     // Create facet
     const mesh::Facet facet(mesh, _facets[f]);
 
-    // Get cell to which facet belongs.
+    // Get cell to which facet belongs
     assert(facet.num_entities(D) > 0);
     const std::size_t cell_index = facet.entities(D)[0];
 
@@ -419,15 +447,11 @@ void DirichletBC::compute_bc_topological(Map& boundary_values,
     // Tabulate dofs on cell
     auto cell_dofs = dofmap.cell_dofs(cell.index());
 
-    // Tabulate which dofs are on the facet
-    dofmap.tabulate_entity_closure_dofs(data.facet_dofs, D - 1,
-                                        facet_local_index);
-
     // Pick values for facet
     for (std::size_t i = 0; i < num_facet_dofs; i++)
     {
-      const std::size_t local_dof = cell_dofs[data.facet_dofs[i]];
-      const PetscScalar value = data.w[data.facet_dofs[i]];
+      const std::size_t local_dof = cell_dofs[facet_dofs[facet_local_index][i]];
+      const PetscScalar value = data.w[facet_dofs[facet_local_index][i]];
       boundary_values[local_dof] = value;
     }
   }
@@ -776,9 +800,6 @@ bool DirichletBC::on_facet(const Eigen::Ref<EigenArrayXd> coordinates,
 //-----------------------------------------------------------------------------
 DirichletBC::LocalData::LocalData(const function::FunctionSpace& V)
     : w(V.dofmap()->max_element_dofs(), 0.0),
-      facet_dofs(
-          V.dofmap()->num_entity_closure_dofs(V.mesh()->geometry().dim() - 1),
-          0),
       // FIXME: the below should not be max_element_dofs! It should be fixed.
       coordinates(V.dofmap()->max_element_dofs(), V.mesh()->geometry().dim())
 {

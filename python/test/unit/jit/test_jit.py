@@ -1,18 +1,16 @@
-"""Unit tests for the JIT compiler"""
-
 # Copyright (C) 2011 Anders Logg
 #
 # This file is part of DOLFIN (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+"""Unit tests for the JIT compiler"""
 
 import pytest
+
 import dolfin
 from dolfin import MPI, compile_cpp_code
 from dolfin.la import PETScVector
-from dolfin_utils.test import (skip_if_not_SLEPc,
-                               skip_in_serial, skip_if_not_petsc4py)
-
+from dolfin_utils.test.skips import (skip_if_not_SLEPc, skip_in_serial)
 
 # @pytest.mark.skip
 # def test_nasty_jit_caching_bug():
@@ -52,11 +50,8 @@ def test_mpi_pybind11():
     """
 
     # Import MPI_COMM_WORLD
-    if dolfin.has_mpi4py():
-        from mpi4py import MPI
-        w1 = MPI.COMM_WORLD
-    else:
-        w1 = dolfin.MPI.comm_world
+    from mpi4py import MPI
+    w1 = MPI.COMM_WORLD
 
     # Compile the JIT module
     return pytest.xfail('Include path for dolfin_wrappers/* not set up to '
@@ -66,11 +61,7 @@ def test_mpi_pybind11():
     # Pass a comm into C++ and get a new wrapper of the same comm back
     w2 = mod.test_comm_passing(w1)
 
-    if dolfin.has_mpi4py():
-        assert isinstance(w2, MPI.Comm)
-    else:
-        assert isinstance(w2, dolfin.cpp.MPICommWrapper)
-        assert w1.underlying_comm() == w2.underlying_comm()
+    assert isinstance(w2, MPI.Comm)
 
 
 def test_petsc():
@@ -92,7 +83,7 @@ def test_petsc():
     }
     '''
     module = compile_cpp_code(create_matrix_code)
-    assert(module)
+    assert (module)
 
 
 @pytest.mark.skip
@@ -216,7 +207,6 @@ def test_compile_extension_module_kwargs():
 
 
 @pytest.mark.skip
-@skip_if_not_petsc4py
 @skip_in_serial
 def test_mpi_dependent_jiting():
     # FIXME: Not a proper unit test...
@@ -228,15 +218,8 @@ def test_mpi_dependent_jiting():
     # all processes)
     SubSystemsManager.init_petsc()
 
-    try:
-        import mpi4py.MPI as mpi
-    except ImportError:
-        return
-
-    try:
-        import petsc4py.PETSc as petsc
-    except ImportError:
-        return
+    import mpi4py.MPI as mpi
+    import petsc4py.PETSc as petsc
 
     # Set communicator and get process information
     comm = mpi.COMM_WORLD
@@ -259,10 +242,10 @@ def test_mpi_dependent_jiting():
 
     elif rank == 1:
         e = Expression("5", mpi_comm=group_comm_1, degree=0)
-        assert(e)
+        assert (e)
         domain = CompiledSubDomain(
             "on_boundary", mpi_comm=group_comm_1, degree=0)
-        assert(domain)
+        assert (domain)
 
     else:
         mesh = UnitSquareMesh(group_comm_2, 2, 2)

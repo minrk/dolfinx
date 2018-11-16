@@ -5,10 +5,12 @@
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
 #include "Function.h"
+#include "Expression.h"
 #include "FunctionSpace.h"
 #include <algorithm>
 #include <dolfin/common/IndexMap.h>
 #include <dolfin/common/Timer.h>
+#include <dolfin/common/Variable.h>
 #include <dolfin/common/constants.h>
 #include <dolfin/common/utils.h>
 #include <dolfin/fem/CoordinateMapping.h>
@@ -32,7 +34,8 @@ using namespace dolfin;
 using namespace dolfin::function;
 
 //-----------------------------------------------------------------------------
-Function::Function(std::shared_ptr<const FunctionSpace> V) : _function_space(V)
+Function::Function(std::shared_ptr<const FunctionSpace> V)
+    : common::Variable("u"), _function_space(V)
 {
   // Check that we don't have a subspace
   if (!V->component().empty())
@@ -201,14 +204,14 @@ std::shared_ptr<const la::PETScVector> Function::vector() const
 void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
                                             Eigen::Dynamic, Eigen::RowMajor>>
                         values,
-                    Eigen::Ref<const EigenRowArrayXXd> x) const
+                    const Eigen::Ref<const EigenRowArrayXXd> x) const
 {
   assert(_function_space);
   assert(_function_space->mesh());
   const mesh::Mesh& mesh = *_function_space->mesh();
 
   // Find the cell that contains x
-  for (unsigned int i = 0; i != x.rows(); ++i)
+  for (unsigned int i = 0; i < x.rows(); ++i)
   {
     const double* _x = x.row(i).data();
     const geometry::Point point(mesh.geometry().dim(), _x);
@@ -245,7 +248,7 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
 void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
                                             Eigen::Dynamic, Eigen::RowMajor>>
                         values,
-                    Eigen::Ref<const EigenRowArrayXXd> x,
+                    const Eigen::Ref<const EigenRowArrayXXd> x,
                     const mesh::Cell& cell) const
 {
   assert(_function_space);
@@ -275,7 +278,8 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
   restrict(coefficients.data(), element, cell, coordinate_dofs);
 
   // Get coordinate mapping
-  auto cmap = mesh.geometry().coord_mapping;
+  std::shared_ptr<const fem::CoordinateMapping> cmap
+      = mesh.geometry().coord_mapping;
   if (!cmap)
   {
     throw std::runtime_error(
@@ -295,9 +299,6 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
   Eigen::Tensor<double, 3, Eigen::RowMajor> K(num_points, tdim, gdim);
 
   EigenRowArrayXXd X(x.rows(), tdim);
-
-  // boost::multi_array<double, 3> basis_reference_values(
-  //     boost::extents[num_points][space_dimension][reference_value_size]);
   Eigen::Tensor<double, 3, Eigen::RowMajor> basis_reference_values(
       num_points, space_dimension, reference_value_size);
 
@@ -307,21 +308,14 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
   // Compute reference coordinates X, and J, detJ and K
   cmap->compute_reference_geometry(X, J, detJ, K, x, coordinate_dofs);
 
-  // std::cout << "Physical x: " << std::endl;
-  // std::cout << x << std::endl;
-  // std::cout << "Reference X: " << std::endl;
-  // std::cout << X << std::endl;
-
-  // // Compute basis on reference element
+  // Compute basis on reference element
   element.evaluate_reference_basis(basis_reference_values, X);
 
-  // // Push basis forward to physical element
+  // Push basis forward to physical element
   element.transform_reference_basis(basis_values, basis_reference_values, X, J,
                                     detJ, K);
 
   // Compute expansion
-  // std::cout << "Num points, space dim, value_size: " << num_points << ", "
-  //           << space_dimension << ", " << value_size << std::endl;
   values.setZero();
   for (std::size_t p = 0; p < num_points; ++p)
   {
@@ -329,10 +323,6 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
     {
       for (std::size_t j = 0; j < value_size; ++j)
       {
-        // std::cout << "Loop: " << p << ", " << i << ", " << j << std::endl;
-        // std::cout << "  Coeff, Basis: " << coefficients[i] << ", "
-        //           << basis_values(p, i, j) << std::endl;
-
         // TODO: Find an Eigen shortcut fot this operation
         values.row(p)[j] += coefficients[i] * basis_values(p, i, j);
       }
@@ -340,13 +330,22 @@ void Function::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
   }
 }
 //-----------------------------------------------------------------------------
-void Function::interpolate(const GenericFunction& v)
+void Function::interpolate(const Function& v)
 {
   assert(_vector);
   assert(_function_space);
 
   // Interpolate
   _function_space->interpolate(*_vector, v);
+}
+//-----------------------------------------------------------------------------
+void Function::interpolate(const Expression& expr)
+{
+  assert(_vector);
+  assert(_function_space);
+
+  // Interpolate
+  _function_space->interpolate(*_vector, expr);
 }
 //-----------------------------------------------------------------------------
 std::size_t Function::value_rank() const
@@ -490,5 +489,13 @@ void Function::init_vector()
   _vector = std::make_shared<la::PETScVector>(*index_map);
   assert(_vector);
   _vector->set(0.0);
+}
+//-----------------------------------------------------------------------------
+std::size_t Function::value_size() const
+{
+  std::size_t size = 1;
+  for (std::size_t i = 0; i < value_rank(); ++i)
+    size *= value_dimension(i);
+  return size;
 }
 //-----------------------------------------------------------------------------

@@ -7,23 +7,28 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import pytest
-from dolfin import (UnitSquareMesh, FunctionSpace, MPI, TrialFunction, TestFunction,
-                    Constant, dx, cpp, sym, dot, inner, grad, tr, Identity, VectorFunctionSpace,
-                    Function, DirichletBC, fem)
-from dolfin.la import PETScKrylovSolver, PETScVector, PETScMatrix, PETScOptions, VectorSpaceBasis
+import ufl
+
+from dolfin import (MPI, DirichletBC, Function, FunctionSpace,
+                    Identity, TestFunction, TrialFunction, UnitSquareMesh,
+                    VectorFunctionSpace, cpp, dot, dx, fem, grad, inner, sym,
+                    tr)
+from dolfin.fem import assemble
 from dolfin.fem.assembling import assemble_system
+from dolfin.la import (PETScKrylovSolver, PETScMatrix, PETScOptions,
+                       PETScVector, VectorSpaceBasis)
 
 
 def test_krylov_solver_lu():
 
     mesh = UnitSquareMesh(MPI.comm_world, 12, 12)
-    V = FunctionSpace(mesh, "Lagrange", 1)
+    V = FunctionSpace(mesh, ("Lagrange", 1))
     u, v = TrialFunction(V), TestFunction(V)
 
-    a = Constant(1.0) * inner(u, v) * dx
-    L = inner(Constant(1.0), v) * dx
-    assembler = fem.assembling.Assembler(a, L)
-    A, b = assembler.assemble()
+    a = inner(u, v) * dx
+    L = inner(1.0, v) * dx
+    A = assemble(a)
+    b = assemble(L)
 
     norm = 13.0
 
@@ -56,13 +61,14 @@ def test_krylov_reuse_pc_lu():
             pytest.skip("PETSc version must be 3.5  of higher")
 
     mesh = UnitSquareMesh(MPI.comm_world, 12, 12)
-    V = FunctionSpace(mesh, "Lagrange", 1)
+    V = FunctionSpace(mesh, ("Lagrange", 1))
     u, v = TrialFunction(V), TestFunction(V)
 
-    a = Constant(1.0) * u * v * dx
-    L = Constant(1.0) * v * dx
-    assembler = fem.assembling.Assembler(a, L)
-    A, b = assembler.assemble()
+    a = u * v * dx
+    L = v * dx
+    assembler = fem.Assembler(a, L)
+    A = assembler.assemble_matrix()
+    b = assembler.assemble_vector()
     norm = 13.0
 
     solver = PETScKrylovSolver(mesh.mpi_comm())
@@ -75,7 +81,7 @@ def test_krylov_reuse_pc_lu():
     solver.solve(x, b)
     assert round(x.norm(cpp.la.Norm.l2) - norm, 10) == 0
 
-    assembler = fem.assembling.Assembler(Constant(0.5) * u * v * dx, L)
+    assembler = fem.assemble.Assembler(0.5 * u * v * dx, L)
     assembler.assemble(A)
     x = PETScVector(mesh.mpi_comm())
     solver.solve(x, b)
@@ -120,18 +126,20 @@ def test_krylov_samg_solver_elasticity():
 
         # Stress computation
         def sigma(v):
-            return 2.0 * mu * sym(grad(v)) + lmbda * tr(sym(grad(v))) * Identity(2)
+            return 2.0 * mu * sym(grad(v)) + lmbda * tr(sym(
+                grad(v))) * Identity(2)
 
         # Define problem
         mesh = UnitSquareMesh(MPI.comm_world, N, N)
         V = VectorFunctionSpace(mesh, 'Lagrange', 1)
-        bc = DirichletBC(V, Constant((0.0, 0.0)),
+        bc0 = Function(V)
+        bc = DirichletBC(V.sub(0), bc0,
                          lambda x, on_boundary: on_boundary)
         u = TrialFunction(V)
         v = TestFunction(V)
 
         # Forms
-        a, L = inner(sigma(u), grad(v)) * dx, dot(Constant((1.0, 1.0)), v) * dx
+        a, L = inner(sigma(u), grad(v)) * dx, dot(ufl.as_vector((1.0, 1.0)), v) * dx
 
         # Assemble linear algebra objects
         A, b = assemble_system(a, L, bc)
@@ -150,7 +158,6 @@ def test_krylov_samg_solver_elasticity():
 
         # Create PETSC smoothed aggregation AMG preconditioner, and
         # create CG solver
-#        pc = PETScPreconditioner(method)
         solver = PETScKrylovSolver("cg", method)
 
         # Set matrix operator
@@ -187,13 +194,14 @@ def test_krylov_reuse_pc():
 
     # Define problem
     mesh = UnitSquareMesh(MPI.comm_world, 8, 8)
-    V = FunctionSpace(mesh, 'Lagrange', 1)
-    bc = DirichletBC(V, Constant(0.0), lambda x, on_boundary: on_boundary)
+    V = FunctionSpace(mesh, ('Lagrange', 1))
+    bc0 = Function(V)
+    bc = DirichletBC(V, bc0, lambda x, on_boundary: on_boundary)
     u = TrialFunction(V)
     v = TestFunction(V)
 
     # Forms
-    a, L = inner(grad(u), grad(v)) * dx, dot(Constant(1.0), v) * dx
+    a, L = inner(grad(u), grad(v)) * dx, v * dx
 
     A, P = PETScMatrix(), PETScMatrix()
     b = PETScVector()

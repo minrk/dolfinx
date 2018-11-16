@@ -12,7 +12,6 @@ This demo illustrates how to:
 
 * Solve a linear partial differential equation
 * Create and apply Dirichlet boundary conditions
-* Define Expressions
 * Define a FunctionSpace
 * Create a SubDomain
 
@@ -77,6 +76,8 @@ Poisson equation step-by-step.
 First, the :py:mod:`dolfin` module is imported: ::
 
     import numpy as np
+    import ufl
+
     import dolfin
     from dolfin import *
     from dolfin.io import XDMFFile
@@ -90,9 +91,9 @@ divided into two triangles, we do as follows ::
 
     # Create mesh and define function space
     mesh = RectangleMesh.create(MPI.comm_world,
-        [Point(0,0), Point(1,1)], [32, 32],
+        [Point(0,0)._cpp_object, Point(1,1)._cpp_object], [32, 32],
         CellType.Type.triangle, dolfin.cpp.mesh.GhostMode.none)
-    V = FunctionSpace(mesh, "Lagrange", 1)
+    V = FunctionSpace(mesh, ("Lagrange", 1))
 
     cmap = dolfin.fem.create_coordinate_map(mesh.ufl_domain())
     mesh.geometry.coord_mapping = cmap
@@ -126,12 +127,13 @@ arguments: the function space the boundary condition applies to, the
 value of the boundary condition, and the part of the boundary on which
 the condition applies. In our example, the function space is ``V``,
 the value of the boundary condition (0.0) can represented using a
-:py:class:`Constant <dolfin.functions.constant.Constant>` and the
+:py:class:`Function <dolfin.functions.Function>` and the
 Dirichlet boundary is defined immediately above. The definition of the
 Dirichlet boundary condition then looks as follows: ::
 
     # Define boundary condition
-    u0 = Constant(0.0)
+    u0 = Function(V)
+    u0.vector().set(0.0)
     bc = DirichletBC(V, u0, boundary)
 
 Next, we want to express the variational problem.  First, we need to
@@ -145,12 +147,7 @@ and a :py:class:`TestFunction
 
 Further, the source :math:`f` and the boundary normal derivative
 :math:`g` are involved in the variational forms, and hence we must
-specify these. Both :math:`f` and :math:`g` are given by simple
-mathematical formulas, and can be easily declared using the
-:py:class:`Expression <dolfin.functions.expression.Expression>` class.
-Note that the strings defining ``f`` and ``g`` use C++ syntax since,
-for efficiency, DOLFIN will generate and compile C++ code for these
-expressions at run-time.
+specify these.
 
 With these ingredients, we can write down the bilinear form ``a`` and
 the linear form ``L`` (using UFL operators). In summary, this reads ::
@@ -158,8 +155,9 @@ the linear form ``L`` (using UFL operators). In summary, this reads ::
     # Define variational problem
     u = TrialFunction(V)
     v = TestFunction(V)
-    f = Expression("10*exp(-(pow(x[0] - 0.5, 2) + pow(x[1] - 0.5, 2)) / 0.02)", degree=2)
-    g = Expression("sin(5*x[0])", degree=2)
+    x = SpatialCoordinate(mesh)
+    f = 10 * ufl.exp(-((x[0] - 0.5) ** 2 + (x[1] - 0.5) ** 2) / 0.02)
+    g = ufl.sin(5*x[0])
     a = inner(grad(u), grad(v))*dx
     L = inner(f, v)*dx + inner(g, v)*ds
 
