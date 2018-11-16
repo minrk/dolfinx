@@ -683,8 +683,8 @@ DofMapBuilder::build_ufc_node_graph(const ufc_dofmap& ufc_map,
 
     // Get the edge and facet permutations of the dofs for this cell,
     // based on global vertex indices.
-    dofmaps[0]->tabulate_dof_permutations(permutation.data(),
-                                          entity_indices_ptr[0]);
+    //    dofmaps[0]->tabulate_dof_permutations(permutation.data(),
+    //                                          entity_indices_ptr[0]);
 
     GenericDofMap::permutation(permutation, cell_type.cell_type(), entity_dofs,
                                entity_indices_ptr[0]);

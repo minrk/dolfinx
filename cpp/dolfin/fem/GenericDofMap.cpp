@@ -263,7 +263,13 @@ void GenericDofMap::permutation(
     // Generate lattice for Lagrange element
     // n = polynomial degree
     // FIXME - how to get n here?
-    const unsigned int n = 4;
+    unsigned int n = 1;
+    while (n * (n - 1) / 2 < entity_dofs[2][0].size())
+      ++n;
+    ++n;
+
+    std::cout << "Guessing P" << n << "\n";
+
     unsigned int c = 0;
     std::vector<std::vector<unsigned int>> facet_dof_coords(n - 2);
     for (unsigned int j = 0; j < n - 2; ++j)
