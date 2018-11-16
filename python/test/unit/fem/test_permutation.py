@@ -19,6 +19,7 @@ from dolfin import function
 from dolfin.cpp.mesh import GhostMode
 from dolfin_utils.test.skips import skip_in_parallel
 
+
 @skip_in_parallel
 @pytest.mark.parametrize('degree', [3, 4])
 def test_scalar_vector(degree):
@@ -75,6 +76,7 @@ def test_scalar_vector(degree):
             assert numpy.isclose(pt[1], result[1])
             assert numpy.isclose(0.0, result[2])
 
+
 @pytest.mark.parametrize('degree', [3, 4])
 def test_perm_parallel_2d(degree):
     mesh = UnitSquareMesh(MPI.comm_world, 5, 8)
@@ -99,6 +101,7 @@ def test_perm_parallel_2d(degree):
         p = p.array()[:2]
 
         assert numpy.isclose(F(p)[0], p[0])
+
 
 @pytest.mark.parametrize('degree', [3, 4, 5])
 def test_perm_parallel_3d(degree):
