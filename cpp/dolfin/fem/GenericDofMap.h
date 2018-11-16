@@ -148,10 +148,10 @@ public:
   /// Permutation of dofs (handles mapping for higher-order bases). Pass
   /// in the global vertex indices of a cell (vertex_indices) and return
   /// the required permutation
-  void
+  static void
   permutation(std::vector<int>& perm, mesh::CellType::Type cell_type,
-              const Eigen::Ref<const Eigen::Array<int64_t, Eigen::Dynamic, 1>>
-                  vertex_indices);
+              const std::vector<std::vector<std::vector<int>>>& entity_dofs,
+              const int64_t* vertex_indices);
 };
 } // namespace fem
 } // namespace dolfin

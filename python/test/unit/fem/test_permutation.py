@@ -9,6 +9,7 @@ import itertools
 from random import random
 
 import numpy
+import pytest
 
 from dolfin import (MPI, Cells, CellType, Expression, FiniteElement, Function,
                     FunctionSpace, Mesh, Point, UnitCubeMesh, UnitSquareMesh,
@@ -18,9 +19,9 @@ from dolfin import function
 from dolfin.cpp.mesh import GhostMode
 from dolfin_utils.test.skips import skip_in_parallel
 
-
 @skip_in_parallel
-def test_p4_scalar_vector():
+@pytest.mark.parametrize('degree', [3, 4])
+def test_scalar_vector(degree):
 
     perms = itertools.permutations([1, 2, 3, 4])
 
@@ -35,7 +36,7 @@ def test_p4_scalar_vector():
                     [], GhostMode.none)
         mesh.geometry.coord_mapping = fem.create_coordinate_map(mesh)
 
-        Q = FunctionSpace(mesh, ("CG", 4))
+        Q = FunctionSpace(mesh, ("CG", degree))
 
         @function.expression.numba_eval
         def x0(values, x, cell_idx):
@@ -59,7 +60,7 @@ def test_p4_scalar_vector():
             assert numpy.isclose(pt[1], F1(pt)[0])
             assert numpy.isclose(pt[2], F2(pt)[0])
 
-        V = VectorFunctionSpace(mesh, ("CG", 4))
+        V = VectorFunctionSpace(mesh, ("CG", degree))
 
         @function.expression.numba_eval
         def x0x10(values, x, cell_idx):
@@ -74,10 +75,10 @@ def test_p4_scalar_vector():
             assert numpy.isclose(pt[1], result[1])
             assert numpy.isclose(0.0, result[2])
 
-
-def test_p4_parallel_2d():
+@pytest.mark.parametrize('degree', [3, 4])
+def test_perm_parallel_2d(degree):
     mesh = UnitSquareMesh(MPI.comm_world, 5, 8)
-    Q = FunctionSpace(mesh, ("CG", 4))
+    Q = FunctionSpace(mesh, ("CG", degree))
     F = Function(Q)
 
     @function.expression.numba_eval
@@ -99,10 +100,10 @@ def test_p4_parallel_2d():
 
         assert numpy.isclose(F(p)[0], p[0])
 
-
-def test_p4_parallel_3d():
+@pytest.mark.parametrize('degree', [3, 4, 5])
+def test_perm_parallel_3d(degree):
     mesh = UnitCubeMesh(MPI.comm_world, 3, 5, 8)
-    Q = FunctionSpace(mesh, ("CG", 5))
+    Q = FunctionSpace(mesh, ("CG", degree))
     F = Function(Q)
 
     @function.expression.numba_eval
