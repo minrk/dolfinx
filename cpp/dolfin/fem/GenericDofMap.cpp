@@ -225,21 +225,58 @@ void GenericDofMap::ufc_tabulate_dofs(
 }
 //-----------------------------------------------------------------------------
 void GenericDofMap::permutation(
-    Eigen::Ref<Eigen::Array<int, Eigen::Dynamic, 1>> p,
-    const std::vector<std::vector<Eigen::Array<int, Eigen::Dynamic, 1>>>
-        local_indices,
+    std::vector<int>& perm, mesh::CellType::Type cell_type,
     const Eigen::Ref<const Eigen::Array<int64_t, Eigen::Dynamic, 1>>
         vertex_indices)
 {
-  std::vector<Eigen::Array<int, Eigen::Dynamic, 1>> vertex_local_indices
-      = local_indices[0];
-  int offset = 0;
-  for (auto& e : vertex_local_indices)
-    offset += e.size();
+  // Reset to identity
+  for (unsigned int i = 0; i < perm.size(); ++i)
+    perm[i] = i;
 
-  // Handle edges
+  if (cell_type == mesh::CellType::Type::tetrahedron)
+  {
+    // Get ordering of edges
+    bool edge_ordering[6];
+    edge_ordering[0] = vertex_indices[2] > vertex_indices[3];
+    edge_ordering[1] = vertex_indices[1] > vertex_indices[3];
+    edge_ordering[2] = vertex_indices[1] > vertex_indices[2];
+    edge_ordering[3] = vertex_indices[0] > vertex_indices[3];
+    edge_ordering[4] = vertex_indices[0] > vertex_indices[2];
+    edge_ordering[5] = vertex_indices[0] > vertex_indices[1];
 
+    for (unsigned int j = 0; j < 6; ++j)
+    {
+      if (edge_ordering[j])
+      {
+        // Reverse dofs along this edge
+        const Eigen::Array<int, Eigen::Dynamic, 1> edge_dofs
+            = tabulate_entity_dofs(1, j);
+        const unsigned int n = edge_dofs.size();
+        for (unsigned int i = 0; i < n; ++i)
+          perm[edge_dofs[i]] = edge_dofs[n - i - 1];
+      }
+    }
+  }
+  else if (cell_type == mesh::CellType::Type::triangle)
+  {
+    // Get ordering of edges
+    bool edge_ordering[3];
+    edge_ordering[0] = vertex_indices[1] > vertex_indices[2];
+    edge_ordering[1] = vertex_indices[0] > vertex_indices[2];
+    edge_ordering[2] = vertex_indices[0] > vertex_indices[1];
 
-
+    for (unsigned int j = 0; j < 3; ++j)
+    {
+      if (edge_ordering[j])
+      {
+        // Reverse dofs along this edge
+        const Eigen::Array<int, Eigen::Dynamic, 1> edge_dofs
+            = tabulate_entity_dofs(1, j);
+        const unsigned int n = edge_dofs.size();
+        for (unsigned int i = 0; i < n; ++i)
+          perm[edge_dofs[i]] = edge_dofs[n - i - 1];
+      }
+    }
+  }
 }
 //-----------------------------------------------------------------------------

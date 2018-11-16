@@ -10,6 +10,7 @@
 #include <dolfin/common/Variable.h>
 #include <dolfin/common/types.h>
 #include <dolfin/log/log.h>
+#include <dolfin/mesh/CellType.h>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -145,13 +146,12 @@ public:
       const int64_t* num_global_entities, const int64_t** entity_indices);
 
   /// Permutation of dofs (handles mapping for higher-order bases). Pass
-  /// in the global vertex indices of a cell (vertex_indices)
-  static void permutation(
-      Eigen::Ref<Eigen::Array<int, Eigen::Dynamic, 1>> p,
-      const std::vector<std::vector<Eigen::Array<int, Eigen::Dynamic, 1>>>
-          local_indices,
-      const Eigen::Ref<const Eigen::Array<int64_t, Eigen::Dynamic, 1>>
-          vertex_indices);
+  /// in the global vertex indices of a cell (vertex_indices) and return
+  /// the required permutation
+  void
+  permutation(std::vector<int>& perm, mesh::CellType::Type cell_type,
+              const Eigen::Ref<const Eigen::Array<int64_t, Eigen::Dynamic, 1>>
+                  vertex_indices);
 };
 } // namespace fem
 } // namespace dolfin
