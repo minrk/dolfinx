@@ -250,9 +250,108 @@ void GenericDofMap::permutation(
       {
         // Reverse dofs along this edge
         const std::vector<int>& edge_dofs = entity_dofs[1][j];
-        const unsigned int n = edge_dofs.size();
+        unsigned int n = edge_dofs.size();
         for (unsigned int i = 0; i < n; ++i)
           perm[edge_dofs[i]] = edge_dofs[n - i - 1];
+      }
+    }
+
+    // Edges on each facet
+    static unsigned int facet_edges[4][3]
+        = {{0, 1, 2}, {0, 3, 4}, {1, 3, 5}, {2, 4, 5}};
+
+    // Generate lattice for Lagrange element
+    const unsigned int n = 4;
+    unsigned int c = 0;
+    std::vector<std::vector<unsigned int>> facet_dof_coords(n - 2);
+    for (unsigned int j = 0; j < n - 2; ++j)
+    {
+      for (unsigned int i = 0; i < n - 2 - j; ++i)
+      {
+        facet_dof_coords[j].push_back(c);
+        ++c;
+      }
+    }
+
+    // Facet ordering
+    for (unsigned int j = 0; j < 4; ++j)
+    {
+      const std::vector<int>& facet_dofs = entity_dofs[2][j];
+
+      if (facet_dofs.size() > 1)
+      {
+        const unsigned int* fe = facet_edges[j];
+        int facet_ordering
+            = edge_ordering[fe[0]]
+              + 2 * (edge_ordering[fe[1]] + edge_ordering[fe[2]]);
+
+        std::cout << "Ordering = " << facet_ordering << "\n";
+
+        // Do stuff based on value of facet_ordering (0-5)
+        switch (facet_ordering)
+        {
+        case 0:
+          break;
+        case 1:
+          c = 0;
+          for (unsigned int j = 0; j < n - 2; ++j)
+          {
+            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            {
+              perm[facet_dofs[c]] = facet_dofs[facet_dof_coords[i][j]];
+              ++c;
+            }
+          }
+          break;
+        case 2:
+          c = 0;
+          for (unsigned int j = 0; j < n - 2; ++j)
+          {
+            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            {
+              unsigned int k = n - i - j - 3;
+              perm[facet_dofs[c]] = facet_dofs[facet_dof_coords[j][k]];
+              ++c;
+            }
+          }
+          break;
+        case 3:
+          c = 0;
+          for (unsigned int j = 0; j < n - 2; ++j)
+          {
+            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            {
+              unsigned int k = n - i - j - 3;
+              perm[facet_dofs[c]] = facet_dofs[facet_dof_coords[i][k]];
+              ++c;
+            }
+          }
+          break;
+        case 4:
+          c = 0;
+          for (unsigned int j = 0; j < n - 2; ++j)
+          {
+            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            {
+              unsigned int k = n - i - j - 3;
+              perm[facet_dofs[c]] = facet_dofs[facet_dof_coords[k][j]];
+              ++c;
+            }
+          }
+          break;
+        case 5:
+          c = 0;
+          for (unsigned int j = 0; j < n - 2; ++j)
+          {
+            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            {
+              unsigned int k = n - i - j - 3;
+              perm[facet_dofs[c]] = facet_dofs[facet_dof_coords[k][i]];
+              ++c;
+            }
+          }
+          break;
+        }
       }
     }
   }
@@ -276,5 +375,9 @@ void GenericDofMap::permutation(
       }
     }
   }
+
+  for (auto& q : perm)
+    std::cout << q << " ";
+  std::cout << "\n";
 }
 //-----------------------------------------------------------------------------
