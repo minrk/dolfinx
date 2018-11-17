@@ -282,13 +282,13 @@ void GenericDofMap::permutation(
     }
 
     // Facet ordering
-    for (unsigned int j = 0; j < 4; ++j)
+    for (unsigned int m = 0; m < 4; ++m)
     {
-      const std::vector<int>& facet_dofs = entity_dofs[2][j];
+      const std::vector<int>& facet_dofs = entity_dofs[2][m];
 
       if (facet_dofs.size() > 1)
       {
-        const unsigned int* fe = facet_edges[j];
+        const unsigned int* fe = facet_edges[m];
         int facet_ordering
             = edge_ordering[fe[0]]
               + 2 * (edge_ordering[fe[1]] + edge_ordering[fe[2]]);
