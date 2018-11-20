@@ -7,24 +7,21 @@
 
 from dolfin.function.argument import (TestFunction, TrialFunction, Argument,
                                       TestFunctions, TrialFunctions)
-from dolfin.function.constant import Constant
-from dolfin.function.expression import (BaseExpression, CompiledExpression,
-                                        Expression)
+from dolfin.function.expression import Expression
 from dolfin.function.function import Function
 from dolfin.function.functionspace import (FunctionSpace, VectorFunctionSpace,
                                            TensorFunctionSpace)
-from dolfin.function.jit import compile_expression, jit_generate
 from dolfin.function.specialfunctions import (
-    MeshCoordinates, FacetArea, CellDiameter, CellNormal, CellVolume,
+    CellDiameter, CellNormal, CellVolume,
     Circumradius, SpatialCoordinate, MinCellEdgeLength, MaxCellEdgeLength,
     MinFacetEdgeLength, MaxFacetEdgeLength, FacetNormal)
 
 __all__ = [
     "TestFunction", "TrialFunction", "Argument", "TestFunctions",
-    "TrialFunctions", "Constant", "BaseExpression", "CompiledExpression",
+    "TrialFunctions",
     "Expression", "Function", "FunctionSpace", "VectorFunctionSpace",
     "TensorFunctionSpace", "compile_expression", "jit_generate",
-    "MeshCoordinates", "FacetArea", "CellDiameter", "CellNormal", "CellVolume",
+    "CellDiameter", "CellNormal", "CellVolume",
     "Circumradius", "SpatialCoordinate", "MinCellEdgeLength",
     "MaxCellEdgeLength", "MinFacetEdgeLength", "MaxFacetEdgeLength",
     "FacetNormal"

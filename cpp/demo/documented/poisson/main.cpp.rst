@@ -105,7 +105,7 @@ Then follows the definition of the coefficient functions (for
 
      void eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic,
                                       Eigen::RowMajor>> values,
-        Eigen::Ref<const EigenRowArrayXXd> x) const
+        Eigen::Ref<const EigenRowArrayXXd> x, const dolfin::mesh::Cell& cell) const
      {
      for (unsigned int i = 0; i != x.rows(); ++i)
        {
@@ -124,7 +124,7 @@ Then follows the definition of the coefficient functions (for
 
      void eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic,
                                       Eigen::RowMajor>> values,
-              Eigen::Ref<const EigenRowArrayXXd> x) const
+              Eigen::Ref<const EigenRowArrayXXd> x, const dolfin::mesh::Cell& cell) const
      {
        for (unsigned int i = 0; i != x.rows(); ++i)
            values(i, 0) = sin(5*x(i, 0));
@@ -180,7 +180,7 @@ takes three arguments: the function space the boundary condition
 applies to, the value of the boundary condition, and the part of the
 boundary on which the condition applies. In our example, the function
 space is ``V``, the value of the boundary condition (0.0) can
-represented using a :cpp:class:`Constant`, and the Dirichlet boundary
+represented using a :cpp:class:`Function`, and the Dirichlet boundary
 is defined by the class :cpp:class:`DirichletBoundary` listed
 above. The definition of the Dirichlet boundary condition then looks
 as follows:
@@ -188,7 +188,7 @@ as follows:
 .. code-block:: cpp
 
      // Define boundary condition
-     auto u0 = std::make_shared<function::Constant>(0.0);
+     auto u0 = std::make_shared<function::Function>(V);
      auto boundary = std::make_shared<DirichletBoundary>();
      std::vector<std::shared_ptr<const fem:: DirichletBC>> bc
       = {std::make_shared<fem::DirichletBC>(V, u0, boundary)};
@@ -212,18 +212,23 @@ to the linear form.
     auto L = std::make_shared<fem::Form>(
         std::shared_ptr<ufc_form>(form_L->form()),
         std::initializer_list<std::shared_ptr<const function::FunctionSpace>>{V});
-     auto f = std::make_shared<Source>();
-     auto g = std::make_shared<dUdN>();
-     //L->f = f;
-     //L->g = g;
+    auto f_expr = Source();
+    auto g_expr = dUdN();
+
+    auto f = std::make_shared<function::Function>(V);
+    auto g = std::make_shared<function::Function>(V);
+
+    // Attach 'coordinate mapping' to mesh
+    auto cmap = a->coordinate_mapping();
+    mesh->geometry().coord_mapping = cmap;
+
+    f->interpolate(f_expr);
+    g->interpolate(g_expr);
 
     L->set_coefficient_index_to_name_map(form_L->coefficient_number_map);
     L->set_coefficient_name_to_index_map(form_L->coefficient_name_map);
     L->set_coefficients({ {"f", f}, {"g", g} });
 
-    // Attach 'coordinate mapping' to mesh
-    auto cmap = a->coordinate_mapping();
-    mesh->geometry().coord_mapping = cmap;
 
 Now, we have specified the variational forms and can consider the
 solution of the variational problem. First, we need to define a

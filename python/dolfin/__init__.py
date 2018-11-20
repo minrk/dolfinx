@@ -33,10 +33,9 @@ from .cpp import __version__
 
 
 from dolfin.common import (
-    has_debug, has_scotch,
-    has_mpi4py, has_petsc_complex, has_petsc4py, has_parmetis,
-    has_slepc, has_slepc4py, git_commit_hash,
-    TimingType, timing, timings, list_timings, DOLFIN_EPS)
+    has_debug, has_scotch, has_petsc_complex, has_parmetis, 
+    has_slepc, has_slepc4py, git_commit_hash, TimingType, 
+    timing, timings, list_timings, DOLFIN_EPS)
 
 import dolfin.MPI
 
@@ -68,17 +67,16 @@ from .function.functionspace import (FunctionSpace, VectorFunctionSpace,
 from .function.function import Function
 from .function.argument import (TestFunction, TrialFunction, TestFunctions,
                                 TrialFunctions)
-from .function.constant import Constant
 from .function.specialfunctions import (
-    MeshCoordinates, FacetArea, FacetNormal, CellVolume, SpatialCoordinate,
+    FacetNormal, CellVolume, SpatialCoordinate,
     CellNormal, CellDiameter, Circumradius, MinCellEdgeLength,
     MaxCellEdgeLength, MinFacetEdgeLength, MaxFacetEdgeLength)
-from .function.expression import Expression, UserExpression, CompiledExpression
+from .function.expression import Expression
 
 from .generation import UnitIntervalMesh, UnitSquareMesh, UnitCubeMesh
 
 # experimental
-from .jit.pybind11jit import compile_cpp_code
+from .pybind11jit import compile_cpp_code
 
 #from .la import la_index_dtype
 from .mesh import MeshFunction

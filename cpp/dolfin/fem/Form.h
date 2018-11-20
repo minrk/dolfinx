@@ -116,20 +116,20 @@ public:
   ///
   /// @param[in]  i (std::size_t)
   ///         The given number.
-  /// @param[in]    coefficient (_GenericFunction_)
+  /// @param[in]    coefficient (_Function_)
   ///         The coefficient.
   void set_coefficients(
-      std::map<std::size_t, std::shared_ptr<const function::GenericFunction>>
+      std::map<std::size_t, std::shared_ptr<const function::Function>>
           coefficients);
 
   /// Set coefficient with given name (shared pointer version)
   ///
   /// @param[in]    name (std::string)
   ///         The name.
-  /// @param[in]    coefficient (_GenericFunction_)
+  /// @param[in]    coefficient (_Function_)
   ///         The coefficient.
   void set_coefficients(
-      std::map<std::string, std::shared_ptr<const function::GenericFunction>>
+      std::map<std::string, std::shared_ptr<const function::Function>>
           coefficients);
 
   /// Return original coefficient position for each coefficient (0
@@ -268,9 +268,9 @@ public:
   /// @param coordinate_dofs
   ///    Coordinates of the cell
   ///
-  void
-  tabulate_tensor(PetscScalar* A, mesh::Cell cell,
-                  Eigen::Ref<const EigenRowArrayXXd> coordinate_dofs) const;
+  void tabulate_tensor(
+      PetscScalar* A, const mesh::Cell& cell,
+      const Eigen::Ref<const EigenRowArrayXXd> coordinate_dofs) const;
 
 private:
   // Integrals associated with the Form

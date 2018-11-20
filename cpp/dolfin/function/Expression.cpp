@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2011 Anders Logg
+// Copyright (C) 2009-2018 Michal Habera, Anders Logg and Garth N. Wells
 //
 // This file is part of DOLFIN (https://www.fenicsproject.org)
 //
@@ -23,33 +23,15 @@ Expression::Expression(std::vector<std::size_t> value_shape)
   // Do nothing
 }
 //-----------------------------------------------------------------------------
-Expression::Expression(const Expression& expression)
-    : _value_shape(expression._value_shape)
+Expression::Expression(
+    std::function<void(PetscScalar* values, const double* x,
+                       const int64_t* cell_idx, int num_points, int value_size,
+                       int gdim, int num_cells)>
+        eval_ptr,
+    std::vector<std::size_t> value_shape)
+    : _eval_ptr(eval_ptr), _value_shape(value_shape)
 {
   // Do nothing
-}
-//-----------------------------------------------------------------------------
-Expression::~Expression()
-{
-  // Do nothing
-}
-//-----------------------------------------------------------------------------
-void Expression::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
-                                              Eigen::Dynamic, Eigen::RowMajor>>
-                          values,
-                      const Eigen::Ref<const EigenRowArrayXXd> x,
-                      const mesh::Cell& cell) const
-{
-  // Redirect to simple eval
-  eval(values, x);
-}
-//-----------------------------------------------------------------------------
-void Expression::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
-                                              Eigen::Dynamic, Eigen::RowMajor>>
-                          values,
-                      const Eigen::Ref<const EigenRowArrayXXd> x) const
-{
-  throw std::runtime_error("Missing Expression::eval() (must be overloaded)");
 }
 //-----------------------------------------------------------------------------
 std::size_t Expression::value_rank() const { return _value_shape.size(); }
@@ -71,40 +53,13 @@ std::vector<std::size_t> Expression::value_shape() const
   return _value_shape;
 }
 //-----------------------------------------------------------------------------
-void Expression::set_property(std::string name, PetscScalar value)
-{
-  throw std::runtime_error(
-      "Expression::set_property should be overloaded in the derived class");
-}
-//-----------------------------------------------------------------------------
-PetscScalar Expression::get_property(std::string name) const
-{
-  throw std::runtime_error(
-      "Expression::get_property should be overloaded in the derived class");
-  return 0.0;
-}
-//-----------------------------------------------------------------------------
-void Expression::set_generic_function(std::string name,
-                                      std::shared_ptr<GenericFunction>)
-{
-  throw std::runtime_error("Expression::set_generic_function should be "
-                           "overloaded in the derived class");
-}
-//-----------------------------------------------------------------------------
-std::shared_ptr<GenericFunction>
-Expression::get_generic_function(std::string name) const
-{
-  throw std::runtime_error("Expression::get_generic_function should be "
-                           "overloaded in the derived class");
-  return std::shared_ptr<GenericFunction>();
-}
-//-----------------------------------------------------------------------------
 void Expression::restrict(
     PetscScalar* w, const fem::FiniteElement& element, const mesh::Cell& cell,
     const Eigen::Ref<const EigenRowArrayXXd>& coordinate_dofs) const
 {
   // Get evaluation points
-  const std::size_t vs = value_size();
+  const std::size_t value_size = std::accumulate(
+      std::begin(_value_shape), std::end(_value_shape), 1, std::multiplies<>());
   const std::size_t ndofs = element.space_dimension();
   const std::size_t gdim = cell.mesh().geometry().dim();
 
@@ -123,13 +78,15 @@ void Expression::restrict(
   }
   const fem::CoordinateMapping& cmap = *cell.mesh().geometry().coord_mapping;
 
+  // FIXME: Avoid dynamic memory allocation
   Eigen::Array<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       eval_points(ndofs, gdim);
   cmap.compute_physical_coordinates(eval_points, X, coordinate_dofs);
 
+  // FIXME: Avoid dynamic memory allocation
   // Storage for evaluation values
   Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      eval_values(ndofs, vs);
+      eval_values(ndofs, value_size);
 
   // Evaluate all points in one call
   eval(eval_values, eval_points, cell);
@@ -145,7 +102,8 @@ Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
 Expression::compute_point_values(const mesh::Mesh& mesh) const
 {
   // Local data for vertex values
-  const std::size_t size = value_size();
+  const std::size_t size = std::accumulate(
+      std::begin(_value_shape), std::end(_value_shape), 1, std::multiplies<>());
   Eigen::Matrix<PetscScalar, 1, Eigen::Dynamic> local_vertex_values(size);
 
   // Resize vertex_values
@@ -162,7 +120,7 @@ Expression::compute_point_values(const mesh::Mesh& mesh) const
       const Eigen::Ref<const Eigen::VectorXd> x = vertex.x();
 
       // Evaluate at vertex
-      eval(local_vertex_values, x);
+      eval(local_vertex_values, x, cell);
 
       // Copy to array
       vertex_values.row(vertex.index()) = local_vertex_values;
@@ -172,8 +130,15 @@ Expression::compute_point_values(const mesh::Mesh& mesh) const
   return vertex_values;
 }
 //-----------------------------------------------------------------------------
-std::shared_ptr<const FunctionSpace> Expression::function_space() const
+void Expression::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                              Eigen::Dynamic, Eigen::RowMajor>>
+                          values,
+                      const Eigen::Ref<const EigenRowArrayXXd> x,
+                      const mesh::Cell& cell) const
 {
-  return std::shared_ptr<const FunctionSpace>();
+  const int64_t cell_idx = cell.index();
+  assert(_eval_ptr);
+  _eval_ptr(values.data(), x.data(), &cell_idx, x.rows(), values.cols(),
+            x.cols(), 1);
 }
 //-----------------------------------------------------------------------------
