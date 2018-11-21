@@ -27,8 +27,8 @@ public:
     if (cell_type == mesh::CellType::Type::tetrahedron)
     {
       // nfacet_dofs should be a triangular number
-      int nfacet_dofs = entity_dofs[2][0].size();
-      int n = (std::sqrt(1 + 8 * nfacet_dofs) - 1) / 2;
+      unsigned int nfacet_dofs = entity_dofs[2][0].size();
+      unsigned int n = (std::sqrt(1 + 8 * nfacet_dofs) - 1) / 2;
       if (n * (n + 1) != 2 * nfacet_dofs)
         throw std::runtime_error("Tetrahedron facet dofs not triangular");
 
@@ -47,8 +47,8 @@ public:
     else if (cell_type == mesh::CellType::Type::hexahedron)
     {
       // nfacet_dofs should be a square number
-      int nfacet_dofs = entity_dofs[2][0].size();
-      int n = std::sqrt(nfacet_dofs);
+      unsigned int nfacet_dofs = entity_dofs[2][0].size();
+      unsigned int n = std::sqrt(nfacet_dofs);
       if (n * n != nfacet_dofs)
         throw std::runtime_error("Hexahedron facet dofs not square");
 
