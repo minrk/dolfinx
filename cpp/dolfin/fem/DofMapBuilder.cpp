@@ -5,6 +5,7 @@
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
 #include "DofMapBuilder.h"
+#include "CellDofLayout.h"
 #include "DofMap.h"
 #include <cstdlib>
 #include <dolfin/common/IndexMap.h>
@@ -661,6 +662,8 @@ DofMapBuilder::build_ufc_node_graph(const ufc_dofmap& ufc_map,
       dofmaps[0]->tabulate_entity_dofs(entity_dofs[d][i].data(), d, i);
     }
   }
+
+  CellDofLayout dof_layout(cell_type.cell_type(), entity_dofs);
 
   // Build dofmaps from ufc_dofmap
   for (auto& cell : mesh::MeshRange<mesh::Cell>(mesh, mesh::MeshRangeType::ALL))

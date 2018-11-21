@@ -1,5 +1,6 @@
 
 #include "GenericDofMap.h"
+#include "CellDofLayout.h"
 #include <dolfin/common/IndexMap.h>
 #include <dolfin/mesh/Cell.h>
 #include <dolfin/mesh/MeshIterator.h>
