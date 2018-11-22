@@ -6,6 +6,7 @@
 
 #include <dolfin/mesh/CellType.h>
 #include <vector>
+#include <string>
 
 #pragma once
 
@@ -30,7 +31,7 @@ public:
       unsigned int nfacet_dofs = entity_dofs[2][0].size();
       unsigned int n = (std::sqrt(1 + 8 * nfacet_dofs) - 1) / 2;
       if (n * (n + 1) != 2 * nfacet_dofs)
-        throw std::runtime_error("Tetrahedron facet dofs not triangular");
+        throw std::runtime_error("Tetrahedron facet dofs not triangular: " + std::to_string(n));
 
       unsigned int c = 0;
       _facet_dof_coords.resize(n);
