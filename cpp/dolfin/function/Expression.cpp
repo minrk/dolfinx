@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2011 Anders Logg
+// Copyright (C) 2009-2018 Michal Habera, Anders Logg and Garth N. Wells
 //
 // This file is part of DOLFIN (https://www.fenicsproject.org)
 //
@@ -23,13 +23,13 @@ Expression::Expression(std::vector<std::size_t> value_shape)
   // Do nothing
 }
 //-----------------------------------------------------------------------------
-Expression::Expression(const Expression& expression)
-    : _value_shape(expression._value_shape)
-{
-  // Do nothing
-}
-//-----------------------------------------------------------------------------
-Expression::~Expression()
+Expression::Expression(
+    std::function<void(PetscScalar* values, const double* x,
+                       const int64_t* cell_idx, int num_points, int value_size,
+                       int gdim, int num_cells)>
+        eval_ptr,
+    std::vector<std::size_t> value_shape)
+    : _eval_ptr(eval_ptr), _value_shape(value_shape)
 {
   // Do nothing
 }
@@ -78,20 +78,18 @@ void Expression::restrict(
   }
   const fem::CoordinateMapping& cmap = *cell.mesh().geometry().coord_mapping;
 
+  // FIXME: Avoid dynamic memory allocation
   Eigen::Array<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       eval_points(ndofs, gdim);
   cmap.compute_physical_coordinates(eval_points, X, coordinate_dofs);
 
+  // FIXME: Avoid dynamic memory allocation
   // Storage for evaluation values
   Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       eval_values(ndofs, value_size);
 
-  // Prepare array of cell indices
-  std::vector<int64_t> cell_idx = {cell.index()};
-
   // Evaluate all points in one call
-  eval(eval_values.data(), eval_points.data(), cell_idx.data(), ndofs,
-       value_size, gdim, 1);
+  eval(eval_values, eval_points, cell);
 
   // FIXME: *do not* use UFC directly
   // Apply a mapping to the reference element.
@@ -107,7 +105,6 @@ Expression::compute_point_values(const mesh::Mesh& mesh) const
   const std::size_t size = std::accumulate(
       std::begin(_value_shape), std::end(_value_shape), 1, std::multiplies<>());
   Eigen::Matrix<PetscScalar, 1, Eigen::Dynamic> local_vertex_values(size);
-  const std::size_t gdim = mesh.geometry().dim();
 
   // Resize vertex_values
   Eigen::Array<PetscScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
@@ -116,9 +113,6 @@ Expression::compute_point_values(const mesh::Mesh& mesh) const
   // Iterate over cells, overwriting values when repeatedly visiting vertices
   for (auto& cell : mesh::MeshRange<mesh::Cell>(mesh, mesh::MeshRangeType::ALL))
   {
-    // Prepare array of cell indices
-    std::vector<int64_t> cell_idx = {cell.index()};
-
     // Iterate over cell vertices
     for (auto& vertex : mesh::EntityRange<mesh::Vertex>(cell))
     {
@@ -126,8 +120,7 @@ Expression::compute_point_values(const mesh::Mesh& mesh) const
       const Eigen::Ref<const Eigen::VectorXd> x = vertex.x();
 
       // Evaluate at vertex
-      eval(local_vertex_values.data(), x.data(), cell_idx.data(), 1, size,
-           gdim, 1);
+      eval(local_vertex_values, x, cell);
 
       // Copy to array
       vertex_values.row(vertex.index()) = local_vertex_values;
@@ -135,5 +128,17 @@ Expression::compute_point_values(const mesh::Mesh& mesh) const
   }
 
   return vertex_values;
+}
+//-----------------------------------------------------------------------------
+void Expression::eval(Eigen::Ref<Eigen::Array<PetscScalar, Eigen::Dynamic,
+                                              Eigen::Dynamic, Eigen::RowMajor>>
+                          values,
+                      const Eigen::Ref<const EigenRowArrayXXd> x,
+                      const mesh::Cell& cell) const
+{
+  const int64_t cell_idx = cell.index();
+  assert(_eval_ptr);
+  _eval_ptr(values.data(), x.data(), &cell_idx, x.rows(), values.cols(),
+            x.cols(), 1);
 }
 //-----------------------------------------------------------------------------
