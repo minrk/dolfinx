@@ -38,8 +38,7 @@ void CellDofLayout::permutation(std::vector<int>& perm,
     if (n * (n + 1) != 2 * nfacet_dofs)
     {
       log::warning("Tetrahedron facet dofs not triangular: "
-                   + std::to_string(nfacet_dofs))
-          + " - not permuting...";
+                   + std::to_string(nfacet_dofs) + " - not permuting...");
       return;
     }
 
