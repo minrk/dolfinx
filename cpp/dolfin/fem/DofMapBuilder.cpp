@@ -689,8 +689,7 @@ DofMapBuilder::build_ufc_node_graph(const ufc_dofmap& ufc_map,
     //    dofmaps[0]->tabulate_dof_permutations(permutation.data(),
     //                                          entity_indices_ptr[0]);
 
-    GenericDofMap::permutation(permutation, cell_type.cell_type(), entity_dofs,
-                               entity_indices_ptr[0]);
+    dof_layout.permutation(permutation, entity_indices_ptr[0]);
 
     // Copy to cell dofs, with permutation
     for (unsigned int i = 0; i < local_dim; ++i)

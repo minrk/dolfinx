@@ -3,6 +3,7 @@ set(HEADERS
   assemble_matrix_impl.h
   assemble_vector_impl.h
   AssemblerBase.h
+  CellDofLayout.h
   CoordinateMapping.h
   DirichletBC.h
   DiscreteOperators.h
@@ -28,6 +29,7 @@ set(SOURCES
   assemble_matrix_impl.cpp
   assemble_vector_impl.cpp
   AssemblerBase.cpp
+  CellDofLayout.cpp
   DirichletBC.cpp
   DiscreteOperators.cpp
   DofMapBuilder.cpp
