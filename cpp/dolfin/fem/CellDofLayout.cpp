@@ -20,7 +20,8 @@ CellDofLayout::CellDofLayout(
 {
 }
 //-----------------------------------------------------------------------------
-int q_ij(int i, int j, int n) { return i + ((2 * n + 1 - j) * j) / 2; }
+// Helper function to get layout of dofs on a triangular facet
+int tri_layout_ij(int i, int j, int n) { return i + ((2 * n + 1 - j) * j) / 2; }
 //-----------------------------------------------------------------------------
 void CellDofLayout::permutation(std::vector<int>& perm,
                                 const int64_t* vertex_indices)
@@ -37,7 +38,8 @@ void CellDofLayout::permutation(std::vector<int>& perm,
     if (n * (n + 1) != 2 * nfacet_dofs)
     {
       log::warning("Tetrahedron facet dofs not triangular: "
-                   + std::to_string(nfacet_dofs));
+                   + std::to_string(nfacet_dofs))
+          + " - not permuting...";
       return;
     }
 
@@ -56,9 +58,9 @@ void CellDofLayout::permutation(std::vector<int>& perm,
       {
         // Reverse dofs along this edge
         const std::vector<int>& edge_dofs = _entity_dofs[1][j];
-        unsigned int n = edge_dofs.size();
-        for (unsigned int i = 0; i < n; ++i)
-          perm[edge_dofs[i]] = edge_dofs[n - i - 1];
+        unsigned int ne = edge_dofs.size();
+        for (unsigned int i = 0; i < ne; ++i)
+          perm[edge_dofs[i]] = edge_dofs[ne - i - 1];
       }
     }
 
@@ -66,11 +68,11 @@ void CellDofLayout::permutation(std::vector<int>& perm,
     static unsigned int facet_edges[4][3]
         = {{0, 1, 2}, {0, 3, 4}, {1, 3, 5}, {2, 4, 5}};
 
-    int c;
     // Facet ordering
     for (unsigned int m = 0; m < 4; ++m)
     {
       const std::vector<int>& facet_dofs = _entity_dofs[2][m];
+      unsigned int c = 0;
 
       if (facet_dofs.size() > 1)
       {
@@ -87,60 +89,55 @@ void CellDofLayout::permutation(std::vector<int>& perm,
         case 0:
           break;
         case 1:
-          c = 0;
-          for (unsigned int j = 0; j < n - 2; ++j)
+          for (unsigned int j = 0; j < n; ++j)
           {
-            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            for (unsigned int i = 0; i < n - j; ++i)
             {
-              perm[facet_dofs[c]] = facet_dofs[q_ij(i, j, n)];
+              perm[facet_dofs[c]] = facet_dofs[tri_layout_ij(j, i, n)];
               ++c;
             }
           }
           break;
         case 2:
-          c = 0;
-          for (unsigned int j = 0; j < n - 2; ++j)
+          for (unsigned int j = 0; j < n; ++j)
           {
-            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            for (unsigned int i = 0; i < n - j; ++i)
             {
-              unsigned int k = n - i - j - 3;
-              perm[facet_dofs[c]] = facet_dofs[q_ij(j, k, n)];
+              unsigned int k = n - i - j - 1;
+              perm[facet_dofs[c]] = facet_dofs[tri_layout_ij(k, j, n)];
               ++c;
             }
           }
           break;
         case 3:
-          c = 0;
-          for (unsigned int j = 0; j < n - 2; ++j)
+          for (unsigned int j = 0; j < n; ++j)
           {
-            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            for (unsigned int i = 0; i < n - j; ++i)
             {
-              unsigned int k = n - i - j - 3;
-              perm[facet_dofs[c]] = facet_dofs[q_ij(i, k, n)];
+              unsigned int k = n - i - j - 1;
+              perm[facet_dofs[c]] = facet_dofs[tri_layout_ij(k, i, n)];
               ++c;
             }
           }
           break;
         case 4:
-          c = 0;
-          for (unsigned int j = 0; j < n - 2; ++j)
+          for (unsigned int j = 0; j < n; ++j)
           {
-            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            for (unsigned int i = 0; i < n - j; ++i)
             {
-              unsigned int k = n - i - j - 3;
-              perm[facet_dofs[c]] = facet_dofs[q_ij(k, j, n)];
+              unsigned int k = n - i - j - 1;
+              perm[facet_dofs[c]] = facet_dofs[tri_layout_ij(j, k, n)];
               ++c;
             }
           }
           break;
         case 5:
-          c = 0;
-          for (unsigned int j = 0; j < n - 2; ++j)
+          for (unsigned int j = 0; j < n; ++j)
           {
-            for (unsigned int i = 0; i < n - 2 - j; ++i)
+            for (unsigned int i = 0; i < n - j; ++i)
             {
-              unsigned int k = n - i - j - 3;
-              perm[facet_dofs[c]] = facet_dofs[q_ij(k, i, n)];
+              unsigned int k = n - i - j - 1;
+              perm[facet_dofs[c]] = facet_dofs[tri_layout_ij(i, k, n)];
               ++c;
             }
           }
@@ -163,9 +160,9 @@ void CellDofLayout::permutation(std::vector<int>& perm,
       {
         // Reverse dofs along this edge
         const std::vector<int>& edge_dofs = _entity_dofs[1][j];
-        const unsigned int n = edge_dofs.size();
-        for (unsigned int i = 0; i < n; ++i)
-          perm[edge_dofs[i]] = edge_dofs[n - i - 1];
+        const unsigned int ne = edge_dofs.size();
+        for (unsigned int i = 0; i < ne; ++i)
+          perm[edge_dofs[i]] = edge_dofs[ne - i - 1];
       }
     }
   }
