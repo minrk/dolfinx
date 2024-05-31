@@ -10,9 +10,10 @@ import os
 import sys
 
 if sys.platform.startswith("win32"):
-    os.add_dll_directory("D:/a/dolfinx/dolfinx-install/bin")  # type: ignore
-    os.add_dll_directory("C:/Program Files (x86)/Intel/oneAPI/mpi/2021.12/opt/mpi/libfabric/bin")  # type: ignore
-
+    _dll_path_list = os.environ.get("DOLFINX_ADD_DLL_DIRECTORIES", "")
+    if _dll_path_list:
+        for _dll_path in _dll_path_list.split(os.pathsep):
+            os.add_dll_directorys(_dll_path)
 
 try:
     from petsc4py import PETSc as _PETSc

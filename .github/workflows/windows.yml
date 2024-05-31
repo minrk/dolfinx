@@ -15,6 +15,7 @@ jobs:
     runs-on: windows-latest
     env:
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      DOLFINX_ADD_DLL_DIRECTORIES: "D:/a/dolfinx/dolfinx-install/bin;C:/Program Files (x86)/Intel/oneAPI/mpi/2021.12/opt/mpi/libfabric/bin"
 
     steps:
       - name: Export GitHub Actions cache environment variables
