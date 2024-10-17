@@ -32,9 +32,10 @@ jobs:
     steps:
       - uses: conda-incubator/setup-miniconda@v3
         with:
+          auto-update-conda: true
           python-version: ${{ matrix.python-version }}
-          miniforge-version: latest
           use-mamba: true
+          channels: conda-forge
           activate-environment: fenics
       
       - name: Install DOLFINx with MPICH (Unix-like)
@@ -47,10 +48,21 @@ jobs:
           mamba install fenics-dolfinx
       
       - name: Test
+        if: ${{ runner.os != 'Windows' }}
         run: |
           conda info
           conda list
-          conda activate fenics
-          mamba run -n fenics --no-catpure-output mpiexec --version
-          mamba run -n fenics --no-catpure-output mpiexec -v -np 1 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
-          mamba run -n fenics --no-catpure-output mpiexec -v -np 2 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
+          mpiexec --version
+          mpiexec -v -np 1 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
+          mpiexec -v -np 2 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
+
+      - name: Test (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          echo PATH ${env:PATH}
+          conda info
+          conda list
+          mpiexec --version
+          mpiexec -v -np 1 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
+          mpiexec -v -np 2 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
