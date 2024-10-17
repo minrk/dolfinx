@@ -36,14 +36,17 @@ jobs:
           create-args: >-
             python=${{ matrix.python-version }}
           cache-downloads: true
-          init-shell: >-
-            bash
-            powershell
-            cmd.exe
+
+      - name: init micromamba for cmd.exe (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          micromamba init -s cmd.exe
+
       - name: Install DOLFINx with MPICH (Unix-like)
         if: ${{ runner.os != 'Windows' }}
         run: |
           micromamba install -y fenics-dolfinx mpich
+
       - name: Install DOLFINx (Windows)
         if: ${{ runner.os == 'Windows' }}
         run: |
