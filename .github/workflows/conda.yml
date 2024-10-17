@@ -35,7 +35,8 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           use-mamba: true
-          channels: conda-forge
+          mamba-version: latest
+          channels: conda-forge,nodefaults
           activate-environment: fenics
       
       - name: Install DOLFINx with MPICH (Unix-like)
