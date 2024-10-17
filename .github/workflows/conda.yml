@@ -30,23 +30,23 @@ jobs:
         shell: bash -el {0}
 
     steps:
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: mamba-org/setup-micromamba@v2
         with:
-          auto-update-conda: true
-          python-version: ${{ matrix.python-version }}
-          use-mamba: true
-          mamba-version: '1.*'
-          channels: conda-forge,nodefaults
-          activate-environment: fenics
-      
+          environment-name: dolfinx
+          create-args: >-
+            python=${{ matrix.python-version }}
+          cache-downloads: true
+          init-shell: >-
+            bash
+            powershell
       - name: Install DOLFINx with MPICH (Unix-like)
-        if: ${{ runner.os == 'macOS' || runner.os == 'Linux' }}
+        if: ${{ runner.os != 'Windows' }}
         run: |
-          mamba install fenics-dolfinx mpich
+          micromamba install fenics-dolfinx mpich
       - name: Install DOLFINx (Windows)
         if: ${{ runner.os == 'Windows' }}
         run: |
-          mamba install fenics-dolfinx
+          micromamba install fenics-dolfinx
       
       - name: Test
         if: ${{ runner.os != 'Windows' }}
