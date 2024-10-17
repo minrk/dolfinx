@@ -35,7 +35,7 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           use-mamba: true
-          mamba-version: latest
+          mamba-version: '1.*'
           channels: conda-forge,nodefaults
           activate-environment: fenics
       
