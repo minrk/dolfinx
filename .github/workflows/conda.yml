@@ -28,17 +28,19 @@ jobs:
     steps:
       - uses: conda-incubator/setup-miniconda@v3
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          miniforge-version: latest
+          use-mamba: true
+          activate-environment: fenics
       
       - name: Install DOLFINx with MPICH (Unix-like)
         if: ${{ runner.os == 'macOS' || runner.os == 'Linux' }}
         run: |
-          conda install -c conda-forge fenics-dolfinx mpich
+          mamba install fenics-dolfinx mpich
       - name: Install DOLFINx (Windows)
         if: ${{ runner.os == 'Windows' }}
         run: |
-          conda install -c conda-forge fenics-dolfinx
+          mamba install fenics-dolfinx
       
       - name: Test
         run: |
