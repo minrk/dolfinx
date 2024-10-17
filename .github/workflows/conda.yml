@@ -39,14 +39,15 @@ jobs:
           init-shell: >-
             bash
             powershell
+            cmd.exe
       - name: Install DOLFINx with MPICH (Unix-like)
         if: ${{ runner.os != 'Windows' }}
         run: |
-          micromamba install fenics-dolfinx mpich
+          micromamba install -y fenics-dolfinx mpich
       - name: Install DOLFINx (Windows)
         if: ${{ runner.os == 'Windows' }}
         run: |
-          micromamba install fenics-dolfinx
+          micromamba install -y fenics-dolfinx
       
       - name: Test
         if: ${{ runner.os != 'Windows' }}
@@ -59,11 +60,10 @@ jobs:
 
       - name: Test (Windows)
         if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
+        shell: cmd /C call {0}
         run: |
-          echo PATH ${env:PATH}
-          conda info
-          conda list
+          echo PATH %PATH%
+          micromamba list
           mpiexec --version
-          mpiexec -v -np 1 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
-          mpiexec -v -np 2 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
+          micromamba run -a "" mpiexec -v -np 1 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
+          micromamba run -a "" mpiexec -v -np 2 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
