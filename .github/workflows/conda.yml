@@ -2,7 +2,10 @@ name: Conda install
 
 on:
   # Uncomment the below 'push' to trigger on push
-  #push:
+  push:
+    paths:
+      # only run on push for changes to this file
+      - .github/workflows/conda.yml
   #  branches:
   #     - "**"
   schedule:
