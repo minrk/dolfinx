@@ -62,7 +62,7 @@ jobs:
       # NOTE: Late 2024, Intel MPI is only correctly setup using cmd.exe.
       - name: Test (Windows)
         if: ${{ runner.os == 'Windows' }}
-        shell: pixi run cmd /C {0}
+        shell: pixi run cmd /C CALL {0}
         run: |
           mpiexec --version
           python3 test/test_mesh.py
