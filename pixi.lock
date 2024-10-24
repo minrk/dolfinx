@@ -101,13 +101,13 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/cffi-1.17.1-py312h4389bb4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-basix-0.9.0-py312hf1997e1_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-basix-nanobind-abi-0.2.1.2022-hc2f5e26_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-dolfinx-0.9.0-py312h1ac4452_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-dolfinx-0.9.0-py312h1ac4452_4.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/fenics-ffcx-0.9.0-pyh2e48890_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-libbasix-0.9.0-h8983ae2_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-libdolfinx-0.9.0-h028446a_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/fenics-libdolfinx-0.9.0-h0410833_4.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/fenics-ufcx-0.9.0-h1076a80_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/fenics-ufl-2024.2.0-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/fmt-10.2.1-h181d51b_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/fmt-11.0.2-h7f575de_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/hdf5-1.14.3-mpi_impi_h2ee790a_5.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/impi_rt-2021.12.0-h57928b3_537.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/intel-openmp-2024.2.1-h57928b3_1083.conda
@@ -148,7 +148,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/python-3.12.7-hce54a09_0_cpython.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/python_abi-3.12-5_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/setuptools-75.1.0-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/spdlog-1.13.0-h64d2f7d_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/spdlog-1.14.1-h9f2357e_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/tbb-2021.13.0-hc790b64_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/tk-8.6.13-h5226925_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2024b-hc8b5060_0.conda
@@ -250,18 +250,18 @@ packages:
 - kind: conda
   name: fenics-dolfinx
   version: 0.9.0
-  build: py312h1ac4452_3
-  build_number: 3
+  build: py312h1ac4452_4
+  build_number: 4
   subdir: win-64
-  url: https://conda.anaconda.org/conda-forge/win-64/fenics-dolfinx-0.9.0-py312h1ac4452_3.conda
-  sha256: ba41d67fd303cbe3b1a4dd5820d4f0e13cf22d15259a7ea6216155af246f9eff
-  md5: 82a8cc667aae0581ae63afcadd4be651
+  url: https://conda.anaconda.org/conda-forge/win-64/fenics-dolfinx-0.9.0-py312h1ac4452_4.conda
+  sha256: a73696e8d30153081c3f7f5f4e44629bc795dee213ef55472c2f343d576d044c
+  md5: eb9c3f22fd4bd4ecff96b6b92d305264
   depends:
   - cffi
   - fenics-basix 0.9.*
   - fenics-basix-nanobind-abi 0.2.1.2022
   - fenics-ffcx 0.9.*
-  - fenics-libdolfinx 0.9.0 h028446a_3
+  - fenics-libdolfinx 0.9.0 h0410833_4
   - fenics-ufl 2024.2.*
   - hdf5 >=1.14.3,<1.14.4.0a0 mpi_impi_*
   - impi_rt >=2021.12.0,<2021.12.1.0a0
@@ -276,8 +276,8 @@ packages:
   - vs2022_win-64
   license: LGPL-3.0-or-later
   license_family: LGPL
-  size: 1043629
-  timestamp: 1729021150592
+  size: 1042869
+  timestamp: 1729540080290
 - kind: conda
   name: fenics-dolfinx
   version: 0.9.0
@@ -354,12 +354,12 @@ packages:
 - kind: conda
   name: fenics-libdolfinx
   version: 0.9.0
-  build: h028446a_3
-  build_number: 3
+  build: h0410833_4
+  build_number: 4
   subdir: win-64
-  url: https://conda.anaconda.org/conda-forge/win-64/fenics-libdolfinx-0.9.0-h028446a_3.conda
-  sha256: 808a664b62e258e7f97b5a20daa26648e42eb9d466c6cd73eb7991e8aafd0329
-  md5: ba5ceabf1aeab81e3b9ce9cb8911167f
+  url: https://conda.anaconda.org/conda-forge/win-64/fenics-libdolfinx-0.9.0-h0410833_4.conda
+  sha256: d31adfad9317ab969343e24066ef6c8718a151cff4d19a91470f9aa1eee671b5
+  md5: d04a5b46a2649ebaa14c51c659350a88
   depends:
   - fenics-libbasix >=0.9.0,<0.9.1.0a0
   - fenics-ufcx >=0.9.0,<0.9.1.0a0
@@ -370,14 +370,14 @@ packages:
   - libptscotch >=7.0.5,<7.0.6.0a0
   - libscotch >=7.0.5,<7.0.6.0a0
   - pugixml >=1.14,<1.15.0a0
-  - spdlog >=1.13.0,<1.14.0a0
+  - spdlog >=1.14.1,<1.15.0a0
   - ucrt >=10.0.20348.0
   - vc >=14.3,<15
   - vc14_runtime >=14.40.33810
   license: LGPL-3.0-or-later
   license_family: LGPL
-  size: 1455912
-  timestamp: 1729020677947
+  size: 1444004
+  timestamp: 1729539781097
 - kind: conda
   name: fenics-libdolfinx
   version: 0.9.0
@@ -438,22 +438,6 @@ packages:
   license_family: LGPL
   size: 170343
   timestamp: 1728478155095
-- kind: conda
-  name: fmt
-  version: 10.2.1
-  build: h181d51b_0
-  subdir: win-64
-  url: https://conda.anaconda.org/conda-forge/win-64/fmt-10.2.1-h181d51b_0.conda
-  sha256: 4593d75b6a1e0b5b43fdcba6b968537638a6e469521fb4c3073929f973891828
-  md5: 4253b572559cc775cae49def5c97b3c0
-  depends:
-  - ucrt >=10.0.20348.0
-  - vc >=14.2,<15
-  - vc14_runtime >=14.29.30139
-  license: MIT
-  license_family: MIT
-  size: 185170
-  timestamp: 1704455079451
 - kind: conda
   name: fmt
   version: 11.0.2
@@ -1262,23 +1246,6 @@ packages:
   license_family: MIT
   size: 777462
   timestamp: 1727249510532
-- kind: conda
-  name: spdlog
-  version: 1.13.0
-  build: h64d2f7d_0
-  subdir: win-64
-  url: https://conda.anaconda.org/conda-forge/win-64/spdlog-1.13.0-h64d2f7d_0.conda
-  sha256: 7c5c8d6e2df300f7887e5488a21b11d854ffbc51a1b149af4164d6cbd225fd7a
-  md5: e21d3d1aef3973f78ee161bb053c5922
-  depends:
-  - fmt >=10.2.1,<11.0a0
-  - ucrt >=10.0.20348.0
-  - vc >=14.2,<15
-  - vc14_runtime >=14.29.30139
-  license: MIT
-  license_family: MIT
-  size: 161230
-  timestamp: 1713902489730
 - kind: conda
   name: spdlog
   version: 1.14.1

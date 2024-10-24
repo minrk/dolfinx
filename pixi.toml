@@ -20,4 +20,4 @@ channels = ["minrk/label/windows-broken", "conda-forge"]
 [feature.broken.dependencies]
 fenics-dolfinx = { version = "0.9.0", build = "py312h872a1dc_4", channel="minrk/label/windows-broken" }
 [feature.works.dependencies]
-fenics-dolfinx = { version = "0.9.0", build = "py312h1ac4452_3", channel="conda-forge" }
+fenics-dolfinx = { version = "0.9.0", build = "py312h1ac4452_4", channel="conda-forge" }
