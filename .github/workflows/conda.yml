@@ -71,6 +71,7 @@ jobs:
           export PYTHONUNBUFFERED=1
           export "PATH=$I_MPI_ROOT\bin\libfabric\utils:$I_MPI_ROOT\bin\libfabric:$PATH"
           echo PATH=$PATH
+          export I_MPI_DEBUG=1000
           which mpiexec
           which -a python
           mpiexec --version
