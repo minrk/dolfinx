@@ -62,8 +62,16 @@ jobs:
       # NOTE: Late 2024, Intel MPI is only correctly setup using cmd.exe.
       - name: Test (Windows)
         if: ${{ runner.os == 'Windows' }}
-        shell: pixi run cmd /C CALL {0}
+        shell: pixi run bash -ex {0}
         run: |
+          env | grep PATH
+          env | grep PREFIX
+          # copy activation from impi_rt activate.bat
+          export I_MPI_ROOT="$CONDA_PREFIX/Library"
+          export "PATH=$I_MPI_ROOT/bin/libfabric/utils:$I_MPI_ROOT/bin/libfabric:$PATH"
+          echo PATH=$PATH
+          which mpiexec
+          which -a python3
           mpiexec --version
           python3 test/test_mesh.py
           python3 test/test_dolfinx.py
