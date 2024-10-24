@@ -1,0 +1,12 @@
+[project]
+authors = ["Min RK <benjaminrk@gmail.com>"]
+channels = ["minrk/label/windows-broken", "conda-forge"]
+description = "Add a short description here"
+name = "dolfinx"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+fenics-dolfinx = { version = "0.9.0", build = "py312h872a1dc_4" }
