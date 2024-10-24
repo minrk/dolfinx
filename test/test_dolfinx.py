@@ -4,12 +4,10 @@ import sys
 import basix.ufl
 import ufl
 import dolfinx  # noqa
-import gmsh
 import numpy as np
 import pytest
 from dolfinx import log
 from dolfinx.cpp import common
-from dolfinx.io import gmshio
 from mpi4py import MPI
 from dolfinx import default_scalar_type
 
@@ -59,24 +57,3 @@ def test_mesh():
     domain = dolfinx.mesh.create_mesh(MPI.COMM_SELF, connectivity, nodes, c_el)
     print("mesh created")
 
-def test_gmshio():
-    # meshing example taken from https://jsdokken.com/dolfinx-tutorial/chapter1/membrane_code.html
-    print("initialize")
-    gmsh.initialize()
-    membrane = gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
-    gmsh.model.occ.synchronize()
-    gdim = 2
-    print("physical")
-    gmsh.model.addPhysicalGroup(gdim, [membrane], 1)
-    print("generate")
-    gmsh.model.mesh.generate(gdim)
-
-    gmsh_model_rank = 0
-    mesh_comm = MPI.COMM_WORLD
-    print("model_to_mesh")
-    domain, cell_markers, facet_markers = gmshio.model_to_mesh(
-        gmsh.model, mesh_comm, gmsh_model_rank, gdim=2
-    )
-    print("finalize")
-    gmsh.finalize()
-    print("finalized")
