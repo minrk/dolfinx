@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     # This is necessary to ensure conda environment is activated in every step.
-    defaults:
+    # defaults:
       # run:
         # shell: bash -el {0}
 
