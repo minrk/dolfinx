@@ -1,6 +1,6 @@
 [project]
 authors = ["Min RK <benjaminrk@gmail.com>"]
-channels = ["minrk/label/windows-broken", "conda-forge"]
+channels = ["conda-forge"]
 description = "Add a short description here"
 name = "dolfinx"
 platforms = ["win-64"]
@@ -9,4 +9,15 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
-fenics-dolfinx = { version = "0.9.0", build = "py312h872a1dc_4" }
+python = "3.12.*"
+
+[environments]
+broken = ["broken"]
+works = ["works"]
+
+[feature.broken]
+channels = ["minrk/label/windows-broken", "conda-forge"]
+[feature.broken.dependencies]
+fenics-dolfinx = { version = "0.9.0", build = "py312h872a1dc_4", channel="minrk/label/windows-broken" }
+[feature.works.dependencies]
+fenics-dolfinx = { version = "0.9.0", build = "py312h1ac4452_3", channel="conda-forge" }

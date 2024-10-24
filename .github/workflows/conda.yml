@@ -18,6 +18,9 @@ jobs:
         os: [windows-2022]
         python-version: ["3.12"]
         petsc-scalar-type: ["real"]
+        environment:
+          - works
+          - broken
         # include:
         #   - os: ubuntu-latest
         #     python-version: "3.12"
@@ -34,6 +37,8 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.8.1
         with:
           cache: true
+          cache-key: ${{ matrix.environment }}
+          environments: ${{ matrix.environment }}
       # - uses: conda-incubator/setup-miniconda@v3
       #   with:
       #     auto-update-conda: true
@@ -62,7 +67,7 @@ jobs:
       # NOTE: Late 2024, Intel MPI is only correctly setup using cmd.exe.
       - name: Test (Windows)
         if: ${{ runner.os == 'Windows' }}
-        shell: pixi run bash -ex {0}
+        shell: pixi run -e ${{ matrix.environment }} bash -ex {0}
         run: |
           env | grep PATH
           env | grep PREFIX
