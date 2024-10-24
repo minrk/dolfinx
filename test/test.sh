@@ -19,6 +19,6 @@ mpiexec --version
 mpiexec -n 1 python test/test_mpi.py
 mpiexec -n 2 python test/test_mpi.py
 mpiexec -n 1 python test/test_mesh.py
-python test/test_dolfinx.py
+pytest test/test_dolfinx.py
 mpiexec -v -np 1 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
 mpiexec -v -np 2 python -c "from mpi4py import MPI; import dolfinx; dolfinx.mesh.create_rectangle(comm=MPI.COMM_WORLD, points=((0, 0), (2, 1)), n=(32, 16))"
