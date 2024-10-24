@@ -6,6 +6,12 @@ export I_MPI_ROOT="$CONDA_PREFIX\Library"
 export PYTHONUNBUFFERED=1
 export "PATH=$I_MPI_ROOT\bin\libfabric\utils:$I_MPI_ROOT\bin\libfabric:$PATH"
 echo PATH=$PATH
+
+impi_info
+fi_info -e
+fi_info
+export FI_PROVIDER=tcp
+export FI_TCP_IFACE=eth1
 export I_MPI_DEBUG=1000
 which mpiexec
 which -a python
