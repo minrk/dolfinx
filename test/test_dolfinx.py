@@ -59,8 +59,6 @@ def test_mesh():
     domain = dolfinx.mesh.create_mesh(MPI.COMM_SELF, connectivity, nodes, c_el)
     print("mesh created")
 
-def test_mesh2
-
 def test_gmshio():
     # meshing example taken from https://jsdokken.com/dolfinx-tutorial/chapter1/membrane_code.html
     print("initialize")
