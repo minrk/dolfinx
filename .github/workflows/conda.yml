@@ -68,7 +68,7 @@ jobs:
           env | grep PREFIX
           # copy activation from impi_rt activate.bat
           export I_MPI_ROOT="$CONDA_PREFIX/Library"
-          export "PATH=$I_MPI_ROOT/bin/libfabric/utils:$I_MPI_ROOT/bin/libfabric:$CONDA_PREFIX/Scripts:$CONDA_PREFIX:$PATH"
+          export "PATH=$I_MPI_ROOT/bin/libfabric/utils:$I_MPI_ROOT/bin/libfabric:$CONDA_PREFIX/Scripts:$CONDA_PREFIX:$CONDA_PREFIX/Library/bin:$CONDA_PREFIX/Library:$PATH"
           echo PATH=$PATH
           which mpiexec
           which -a python
